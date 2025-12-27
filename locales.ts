@@ -6,11 +6,20 @@ export const translations = {
     titlePart1: "Sticker",
     titlePart2: "Grid",
     
-    // Auth Screen
-    authTitle: "AI Studio Access",
-    authSubtitle: "To use the Gemini 3 models, please select a Google Cloud API Key.",
-    authBtn: "Select API Key",
-    authNote: "High-quality image generation requires a paid API key.",
+    // Settings
+    settingsTitle: "API Settings",
+    settingsBtn: "Settings",
+    providerLabel: "AI Provider",
+    apiKeyLabel: "API Key",
+    baseUrlLabel: "Base URL (Optional)",
+    saveBtn: "Save Configuration",
+    configureMsg: "Please configure your API settings to start.",
+    
+    // Auth (Legacy/Removed, reused for config prompt)
+    authTitle: "Configure API",
+    authSubtitle: "Enter your API Key to start generating stickers.",
+    authBtn: "Open Settings",
+    authNote: "Your key is stored locally in your browser.",
 
     // Hero
     heroTitle1: "Create Sticker Packs",
@@ -33,7 +42,7 @@ export const translations = {
     promptLabel: "Describe your sticker pack",
     promptPlaceholder: "e.g. A collection of cute isometric sushi characters...",
     btnGenerate: "Generate Stickers",
-    supportsRef: "Supports Reference Images",
+    supportsRef: "Supports Reference Images (Gemini Only)",
     standardGen: "Standard Generation",
 
     // Status
@@ -64,12 +73,21 @@ export const translations = {
     // Header
     titlePart1: "Sticker",
     titlePart2: "Grid",
+
+    // Settings
+    settingsTitle: "API 设置",
+    settingsBtn: "设置",
+    providerLabel: "AI 提供商",
+    apiKeyLabel: "API 密钥",
+    baseUrlLabel: "API 代理地址 (可选)",
+    saveBtn: "保存配置",
+    configureMsg: "请先配置 API 设置。",
     
-    // Auth Screen
-    authTitle: "连接 AI Studio",
-    authSubtitle: "为了使用 Gemini 3 模型，请选择您的 Google Cloud API 密钥。",
-    authBtn: "选择 API 密钥",
-    authNote: "高质量图像生成需要付费项目的 API Key。",
+    // Auth
+    authTitle: "配置 API",
+    authSubtitle: "输入您的 API 密钥以开始生成表情包。",
+    authBtn: "打开设置",
+    authNote: "您的密钥仅存储在本地浏览器中。",
 
     // Hero
     heroTitle1: "极速制作",
@@ -92,7 +110,7 @@ export const translations = {
     promptLabel: "描述你的表情包",
     promptPlaceholder: "例如：一套可爱的等轴测寿司角色...",
     btnGenerate: "开始生成",
-    supportsRef: "支持参考图",
+    supportsRef: "支持参考图 (仅 Gemini)",
     standardGen: "标准生成",
 
     // Status

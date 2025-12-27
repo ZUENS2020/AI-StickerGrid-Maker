@@ -14,3 +14,12 @@ export interface GridDimensions {
 export type ProcessingStatus = 'idle' | 'slicing' | 'analyzing' | 'complete' | 'error';
 
 export type Language = 'en' | 'zh';
+
+export type ApiProvider = 'gemini' | 'openai';
+
+export interface AppSettings {
+  provider: ApiProvider;
+  apiKey: string;
+  baseUrl: string; // Optional, for proxies
+  modelName?: string; // Optional override
+}

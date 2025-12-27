@@ -1,13 +1,5 @@
 import { GoogleGenAI, Type } from "@google/genai";
-
-// Helper to get client with current env key
-const getClient = () => {
-    const apiKey = process.env.API_KEY;
-    if (!apiKey) {
-        throw new Error("API Key not found. Please select a key via the AI Studio button.");
-    }
-    return new GoogleGenAI({ apiKey });
-};
+import { AppSettings } from '../types';
 
 // --- Helpers ---
 
@@ -16,6 +8,8 @@ const fileToBase64 = (file: File): Promise<string> => {
         const reader = new FileReader();
         reader.onload = () => {
             const result = reader.result as string;
+            // Gemini SDK usually takes raw base64, but OpenAI might want dataURI.
+            // We return raw base64 here and add prefix if needed.
             resolve(result.split(',')[1]);
         };
         reader.onerror = reject;
@@ -28,7 +22,6 @@ const blobToBase64 = (blob: Blob): Promise<string> => {
         const reader = new FileReader();
         reader.onloadend = () => {
             const result = reader.result as string;
-            // Handle both data url formats (with and without prefix) just in case
             resolve(result.split(',')[1] || result);
         };
         reader.onerror = reject;
@@ -36,16 +29,24 @@ const blobToBase64 = (blob: Blob): Promise<string> => {
     });
 };
 
-const extractImageFromResponse = (response: any): Blob => {
+const extractImageFromResponse = (response: any, provider: 'gemini' | 'openai'): Blob => {
     let base64Data: string | undefined;
 
-    // Search for the image part in the response
-    if (response.candidates && response.candidates[0].content.parts) {
-        for (const part of response.candidates[0].content.parts) {
-            if (part.inlineData) {
-                base64Data = part.inlineData.data;
-                break;
+    if (provider === 'gemini') {
+        // Search for the image part in the response
+        if (response.candidates && response.candidates[0].content.parts) {
+            for (const part of response.candidates[0].content.parts) {
+                if (part.inlineData) {
+                    base64Data = part.inlineData.data;
+                    break;
+                }
             }
+        }
+    } else {
+        // OpenAI DALL-E response format
+        // { data: [{ b64_json: "..." }] }
+        if (response.data && response.data.length > 0 && response.data[0].b64_json) {
+            base64Data = response.data[0].b64_json;
         }
     }
 
@@ -62,13 +63,40 @@ const extractImageFromResponse = (response: any): Blob => {
     return new Blob([byteArray], { type: 'image/png' });
 };
 
+// --- OpenAI / Compatible Helpers ---
+
+const openAIFetch = async (
+    endpoint: string, 
+    payload: any, 
+    settings: AppSettings
+) => {
+    const baseUrl = settings.baseUrl ? settings.baseUrl.replace(/\/$/, '') : 'https://api.openai.com/v1';
+    const url = `${baseUrl}${endpoint}`;
+    
+    const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${settings.apiKey}`
+        },
+        body: JSON.stringify(payload)
+    });
+
+    const data = await response.json();
+    
+    if (!response.ok) {
+        throw new Error(data.error?.message || `API Request failed: ${response.statusText}`);
+    }
+    return data;
+};
+
+
 // --- Main Exported Functions ---
 
-export const generateStickerLabels = async (imageFile: File): Promise<string[]> => {
-    const ai = getClient();
+export const generateStickerLabels = async (imageFile: File, settings: AppSettings): Promise<string[]> => {
     const base64Data = await fileToBase64(imageFile);
     
-    const systemPrompt = `
+    const systemInstruction = `
         Analyze this image, which is a 4x4 grid of stickers (16 total).
         Provide a short, descriptive filename for each sticker in the grid.
         Read the grid from left to right, top to bottom.
@@ -78,52 +106,99 @@ export const generateStickerLabels = async (imageFile: File): Promise<string[]> 
         Return ONLY a JSON array of strings.
     `;
 
-    const makeRequest = async (modelName: string) => {
-        return await ai.models.generateContent({
-            model: modelName,
-            contents: {
-                parts: [
-                    { inlineData: { mimeType: imageFile.type, data: base64Data } },
-                    { text: systemPrompt }
-                ]
-            },
-            config: {
-                responseMimeType: "application/json",
-                responseSchema: {
-                    type: Type.ARRAY,
-                    items: { type: Type.STRING }
+    if (settings.provider === 'openai') {
+        // OpenAI Vision Request
+        const payload = {
+            model: settings.modelName || "gpt-4o",
+            messages: [
+                {
+                    role: "user",
+                    content: [
+                        { type: "text", text: systemInstruction },
+                        {
+                            type: "image_url",
+                            image_url: {
+                                url: `data:${imageFile.type};base64,${base64Data}`
+                            }
+                        }
+                    ]
                 }
-            }
-        });
-    };
+            ],
+            response_format: { type: "json_object" }
+        };
 
-    let response;
-    try {
-        // Try latest Gemini 3 model
-        response = await makeRequest('gemini-3-flash-preview');
-    } catch (error: any) {
-        console.warn("Gemini 3 Flash failed, attempting fallback.", error);
-        // Fallback to Gemini 2.5
-        response = await makeRequest('gemini-2.5-flash-latest');
-    }
+        const data = await openAIFetch('/chat/completions', payload, settings);
+        try {
+            const content = data.choices[0].message.content;
+            const parsed = JSON.parse(content);
+            // OpenAI might wrap it in a key like { "stickers": [...] } or just return the array if prompted well
+            if (Array.isArray(parsed)) return parsed;
+            if (parsed.stickers && Array.isArray(parsed.stickers)) return parsed.stickers;
+            if (parsed.labels && Array.isArray(parsed.labels)) return parsed.labels;
+            
+            // Fallback: try to find any array
+            const firstArray = Object.values(parsed).find(val => Array.isArray(val));
+            return (firstArray as string[]) || Array(16).fill("sticker");
+        } catch (e) {
+            console.warn("Failed to parse OpenAI JSON", e);
+            return Array(16).fill("sticker");
+        }
 
-    const jsonText = response.text;
-    if (!jsonText) throw new Error("No data returned from AI");
-    
-    try {
-        const labels = JSON.parse(jsonText);
-        return Array.isArray(labels) ? labels : Array(16).fill("sticker");
-    } catch (e) {
-        return Array(16).fill("sticker");
+    } else {
+        // Gemini Request
+        const ai = new GoogleGenAI({ apiKey: settings.apiKey });
+        // Use user defined model or default
+        const modelName = settings.modelName || 'gemini-3-flash-preview';
+        
+        // Handle fallback logic internally if needed, or just let it fail to user
+        try {
+            const response = await ai.models.generateContent({
+                model: modelName,
+                contents: {
+                    parts: [
+                        { inlineData: { mimeType: imageFile.type, data: base64Data } },
+                        { text: systemInstruction }
+                    ]
+                },
+                config: {
+                    responseMimeType: "application/json",
+                    responseSchema: {
+                        type: Type.ARRAY,
+                        items: { type: Type.STRING }
+                    }
+                }
+            });
+
+            const jsonText = response.text;
+            if (!jsonText) throw new Error("No data returned from AI");
+            return JSON.parse(jsonText);
+        } catch (e: any) {
+             // Quick fallback for Gemini
+             if (modelName.includes('gemini-3')) {
+                 const fallbackAi = new GoogleGenAI({ apiKey: settings.apiKey });
+                 const fbResponse = await fallbackAi.models.generateContent({
+                     model: 'gemini-2.5-flash-latest',
+                     contents: {
+                         parts: [
+                             { inlineData: { mimeType: imageFile.type, data: base64Data } },
+                             { text: systemInstruction }
+                         ]
+                     },
+                     config: { responseMimeType: "application/json" }
+                 });
+                 if (fbResponse.text) return JSON.parse(fbResponse.text);
+             }
+             throw e;
+        }
     }
 };
 
 export const generateStickerSheet = async (
     prompt: string, 
-    subjectImage?: File | null, 
-    styleImage?: File | null
+    subjectImage: File | null, 
+    styleImage: File | null,
+    settings: AppSettings
 ): Promise<Blob> => {
-    const ai = getClient();
     
     // Base prompt construction
     let fullPrompt = `Create a high-quality 4x4 grid sticker sheet containing 16 distinct stickers based on this description: "${prompt}". 
@@ -131,63 +206,89 @@ export const generateStickerSheet = async (
     Ensure the stickers are completely separate and do not overlap the grid lines. 
     Style: Vector illustration, vibrant colors, clear outlines.`;
 
-    const parts: any[] = [];
+    if (settings.provider === 'openai') {
+        // OpenAI DALL-E 3 Generation
+        // Note: DALL-E 3 does not support reference images via API in the same way. 
+        // We will just use the text prompt.
+        if (subjectImage || styleImage) {
+            console.warn("OpenAI provider does not support reference images for generation. Ignoring references.");
+        }
 
-    // Attach references if available
-    if (subjectImage) {
-        fullPrompt += `\n\nREFERENCE INSTRUCTION: Use the attached image labeled 'Subject Reference' as the primary source for the character/object design.`;
-        const base64 = await fileToBase64(subjectImage);
-        parts.push({ text: "Subject Reference:" });
-        parts.push({ inlineData: { mimeType: subjectImage.type, data: base64 } });
-    }
+        const payload = {
+            model: "dall-e-3", // User model override usually doesn't apply to image gen, stick to standard
+            prompt: fullPrompt,
+            n: 1,
+            size: "1024x1024",
+            response_format: "b64_json",
+            quality: "standard" 
+        };
 
-    if (styleImage) {
-        fullPrompt += `\n\nREFERENCE INSTRUCTION: Use the attached image labeled 'Style Reference' to determine the artistic style.`;
-        const base64 = await fileToBase64(styleImage);
-        parts.push({ text: "Style Reference:" });
-        parts.push({ inlineData: { mimeType: styleImage.type, data: base64 } });
-    }
+        const data = await openAIFetch('/images/generations', payload, settings);
+        return extractImageFromResponse(data, 'openai');
 
-    parts.push({ text: fullPrompt });
+    } else {
+        // Gemini Generation
+        const ai = new GoogleGenAI({ apiKey: settings.apiKey });
+        const parts: any[] = [];
 
-    try {
-        // Attempt 1: High Quality (Gemini 3 Pro - 4K)
-        const response = await ai.models.generateContent({
-            model: 'gemini-3-pro-image-preview',
-            contents: { parts: parts },
-            config: {
-                imageConfig: {
-                    imageSize: "4K", 
-                    aspectRatio: "1:1"
+        // Attach references if available
+        if (subjectImage) {
+            fullPrompt += `\n\nREFERENCE INSTRUCTION: Use the attached image labeled 'Subject Reference' as the primary source for the character/object design.`;
+            const base64 = await fileToBase64(subjectImage);
+            parts.push({ text: "Subject Reference:" });
+            parts.push({ inlineData: { mimeType: subjectImage.type, data: base64 } });
+        }
+
+        if (styleImage) {
+            fullPrompt += `\n\nREFERENCE INSTRUCTION: Use the attached image labeled 'Style Reference' to determine the artistic style.`;
+            const base64 = await fileToBase64(styleImage);
+            parts.push({ text: "Style Reference:" });
+            parts.push({ inlineData: { mimeType: styleImage.type, data: base64 } });
+        }
+
+        parts.push({ text: fullPrompt });
+
+        try {
+            // Attempt 1: High Quality (Gemini 3 Pro - 4K)
+            // Allow user override if they know what they are doing, else default logic
+            const model = settings.modelName || 'gemini-3-pro-image-preview';
+            
+            const response = await ai.models.generateContent({
+                model: model,
+                contents: { parts: parts },
+                config: {
+                    imageConfig: {
+                        imageSize: "4K", // 2048x2048 effectively
+                        aspectRatio: "1:1"
+                    },
                 },
-            },
-        });
-        return extractImageFromResponse(response);
+            });
+            return extractImageFromResponse(response, 'gemini');
 
-    } catch (error: any) {
-        console.warn("Gemini 3 Pro Image failed (Permission/Access), falling back to Gemini 2.5 Flash Image", error);
-        
-        // Attempt 2: Standard Quality (Gemini 2.5 - 1024x1024)
-        const response = await ai.models.generateContent({
-            model: 'gemini-2.5-flash-image',
-            contents: { parts: parts },
-            config: {
-                imageConfig: {
-                    aspectRatio: "1:1"
+        } catch (error: any) {
+            console.warn("Gemini Primary Image Model failed, falling back to Flash", error);
+            
+            // Attempt 2: Standard Quality
+            const response = await ai.models.generateContent({
+                model: 'gemini-2.5-flash-image',
+                contents: { parts: parts },
+                config: {
+                    imageConfig: {
+                        aspectRatio: "1:1"
+                    },
                 },
-            },
-        });
-        return extractImageFromResponse(response);
+            });
+            return extractImageFromResponse(response, 'gemini');
+        }
     }
 };
 
 export const regenerateSticker = async (
     originalStickerBlob: Blob,
-    modificationPrompt: string
+    modificationPrompt: string,
+    settings: AppSettings
 ): Promise<Blob> => {
-    const ai = getClient();
-    const base64Data = await blobToBase64(originalStickerBlob);
-
+    
     // Prompt engineering to maintain style while applying changes
     const fullPrompt = `
         Modify this input sticker image based strictly on this instruction: "${modificationPrompt}".
@@ -199,25 +300,54 @@ export const regenerateSticker = async (
         4. Do NOT output a grid, just the single modified sticker.
     `;
 
-    const parts = [
-        { inlineData: { mimeType: "image/png", data: base64Data } },
-        { text: fullPrompt }
-    ];
+    if (settings.provider === 'openai') {
+        // OpenAI DALL-E 2 Edit requires masks, DALL-E 3 doesn't do img2img.
+        // We will try DALL-E 3 Variation/Generation if possible, but standard API makes this hard without mask.
+        // Fallback: Generate new image based on description (Loss of context).
+        // For now, let's treat it as a text-to-image request with heavy description, 
+        // OR if the user has a compatible endpoint that supports img2img.
+        // Assuming standard OpenAI:
+        
+        console.warn("OpenAI standard API has limited support for unmasked edits. Generating new variation.");
+        
+        const payload = {
+            model: "dall-e-3",
+            prompt: `A vector sticker on white background. ${modificationPrompt}`,
+            n: 1,
+            size: "1024x1024",
+            response_format: "b64_json"
+        };
+        const data = await openAIFetch('/images/generations', payload, settings);
+        return extractImageFromResponse(data, 'openai');
 
-    try {
-        // Using Gemini 2.5 Flash Image for fast editing/regeneration
-        const response = await ai.models.generateContent({
-            model: 'gemini-2.5-flash-image',
-            contents: { parts: parts },
-            config: {
-                imageConfig: {
-                    aspectRatio: "1:1"
+    } else {
+        // Gemini Generation
+        const ai = new GoogleGenAI({ apiKey: settings.apiKey });
+        const base64Data = await blobToBase64(originalStickerBlob);
+
+        const parts = [
+            { inlineData: { mimeType: "image/png", data: base64Data } },
+            { text: fullPrompt }
+        ];
+
+        try {
+            // Using Gemini 2.5 Flash Image for fast editing/regeneration
+            // Or use user setting if provided, but default to flash-image for speed/cost
+            const model = settings.modelName?.includes('gemini-3') ? 'gemini-3-pro-image-preview' : 'gemini-2.5-flash-image';
+
+            const response = await ai.models.generateContent({
+                model: model,
+                contents: { parts: parts },
+                config: {
+                    imageConfig: {
+                        aspectRatio: "1:1"
+                    },
                 },
-            },
-        });
-        return extractImageFromResponse(response);
-    } catch (error: any) {
-        console.error("Failed to regenerate sticker", error);
-        throw error;
+            });
+            return extractImageFromResponse(response, 'gemini');
+        } catch (error: any) {
+            console.error("Failed to regenerate sticker", error);
+            throw error;
+        }
     }
 };

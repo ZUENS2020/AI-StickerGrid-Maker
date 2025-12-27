@@ -4,9 +4,16 @@ import DropZone from './components/DropZone';
 import GridPreview from './components/GridPreview';
 import { sliceImage } from './services/imageProcessing';
 import { generateStickerLabels, generateStickerSheet, regenerateSticker } from './services/geminiService';
-import { StickerSegment, ProcessingStatus, Language } from './types';
+import { StickerSegment, ProcessingStatus, Language, AppSettings } from './types';
 import { translations } from './locales';
-import { Sparkles, Grid3X3, Wand2, Upload as UploadIcon, Palette, User, Paintbrush, Plus, X, FileWarning, Languages, KeyRound, ArrowRight } from 'lucide-react';
+import { Sparkles, Grid3X3, Wand2, Upload as UploadIcon, Palette, User, Paintbrush, Plus, X, FileWarning, Languages, Settings as SettingsIcon, ArrowRight, Save } from 'lucide-react';
+
+const DEFAULT_SETTINGS: AppSettings = {
+    provider: 'gemini',
+    apiKey: '',
+    baseUrl: '',
+    modelName: ''
+};
 
 const App: React.FC = () => {
   // State
@@ -15,7 +22,11 @@ const App: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [mode, setMode] = useState<'upload' | 'generate'>('upload');
   const [language, setLanguage] = useState<Language>('en');
-  const [hasApiKey, setHasApiKey] = useState(false);
+  
+  // Settings State
+  const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [hasConfigured, setHasConfigured] = useState(false);
 
   // Generation State
   const [prompt, setPrompt] = useState('');
@@ -34,19 +45,7 @@ const App: React.FC = () => {
   // Derived translations
   const t = translations[language];
 
-  // Check API Key
-  const checkApiKey = useCallback(async () => {
-      // Use type assertion to avoid potential TS issues if the global type is not perfectly aligned in this context,
-      // though the error suggests it exists.
-      const aiStudio = (window as any).aistudio;
-      if (aiStudio) {
-          const hasKey = await aiStudio.hasSelectedApiKey();
-          setHasApiKey(hasKey);
-          return hasKey;
-      }
-      return false;
-  }, []);
-
+  // Load Settings on Mount
   useEffect(() => {
       // 1. Detect browser language
       const browserLang = navigator.language.toLowerCase();
@@ -54,16 +53,24 @@ const App: React.FC = () => {
           setLanguage('zh');
       }
       
-      // 2. Check Key
-      checkApiKey();
-  }, [checkApiKey]);
-
-  const handleSelectKey = async () => {
-      const aiStudio = (window as any).aistudio;
-      if (aiStudio) {
-          await aiStudio.openSelectKey();
-          await checkApiKey();
+      // 2. Load Settings
+      const savedSettings = localStorage.getItem('stickergrid_settings');
+      if (savedSettings) {
+          try {
+              const parsed = JSON.parse(savedSettings);
+              setSettings({ ...DEFAULT_SETTINGS, ...parsed });
+              if (parsed.apiKey) setHasConfigured(true);
+          } catch (e) {
+              console.error("Failed to load settings", e);
+          }
       }
+  }, []);
+
+  const saveSettings = (newSettings: AppSettings) => {
+      setSettings(newSettings);
+      localStorage.setItem('stickergrid_settings', JSON.stringify(newSettings));
+      setHasConfigured(!!newSettings.apiKey);
+      setIsSettingsOpen(false);
   };
 
   const toggleLanguage = () => {
@@ -71,6 +78,11 @@ const App: React.FC = () => {
   };
 
   const handleFileSelect = useCallback(async (file: File) => {
+    if (!settings.apiKey) {
+        setIsSettingsOpen(true);
+        return;
+    }
+
     setStatus('slicing');
     setError(null);
     setSegments([]);
@@ -83,7 +95,7 @@ const App: React.FC = () => {
       setStatus('analyzing');
 
       // 2. AI Analysis
-      generateStickerLabels(file)
+      generateStickerLabels(file, settings)
         .then((labels) => {
           setSegments(prev => prev.map((seg, idx) => ({
             ...seg,
@@ -96,11 +108,11 @@ const App: React.FC = () => {
           console.error("AI Analysis failed", err);
           const errorMessage = err?.message || "";
           
-          if (errorMessage.includes("403") || errorMessage.includes("not found")) {
-             setError(language === 'zh' ? "API权限错误，请检查您的密钥项目是否启用了计费。" : "API Error. Please check if your project has billing enabled.");
+          if (errorMessage.includes("401") || errorMessage.includes("403")) {
+             setError(language === 'zh' ? "API 密钥无效，请检查设置。" : "Invalid API Key. Please check settings.");
              setStatus('error'); 
-             // If key is bad, prompt to select again
-             setHasApiKey(false);
+             setHasConfigured(false);
+             setIsSettingsOpen(true);
              return;
           }
 
@@ -114,11 +126,15 @@ const App: React.FC = () => {
       setError(err.message || (language === 'zh' ? '处理图片时发生错误。' : 'An error occurred while processing the image.'));
       setStatus('error');
     }
-  }, [language]);
+  }, [language, settings]);
 
   const handleGenerate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!prompt.trim()) return;
+    if (!settings.apiKey) {
+        setIsSettingsOpen(true);
+        return;
+    }
 
     setIsGenerating(true);
     setStatus('slicing'); 
@@ -126,7 +142,7 @@ const App: React.FC = () => {
     setSegments([]);
 
     try {
-        const imageBlob = await generateStickerSheet(prompt, subjectRef, styleRef);
+        const imageBlob = await generateStickerSheet(prompt, subjectRef, styleRef, settings);
         
         // Convert Blob to File
         const file = new File([imageBlob], "generated-stickers.png", { type: "image/png" });
@@ -137,12 +153,7 @@ const App: React.FC = () => {
     } catch (err: any) {
         setIsGenerating(false);
         console.error(err);
-        if (err.message && err.message.includes("not found")) {
-             setHasApiKey(false);
-             setError(language === 'zh' ? "请重新选择 API 密钥。" : "Please re-select your API Key.");
-        } else {
-             setError(err.message || (language === 'zh' ? "生成图片失败。" : "Failed to generate image."));
-        }
+        setError(err.message || (language === 'zh' ? "生成图片失败。" : "Failed to generate image."));
         setStatus('error');
     }
   };
@@ -158,7 +169,7 @@ const App: React.FC = () => {
 
     const zip = new JSZip();
     segments.forEach((seg) => {
-        const safeLabel = seg.label.replace(/[^a-z0-9-_\u4e00-\u9fa5]/gi, '_'); // Allow chinese chars in filename if user edits
+        const safeLabel = seg.label.replace(/[^a-z0-9-_\u4e00-\u9fa5]/gi, '_'); 
         zip.file(`${safeLabel}.png`, seg.blob);
     });
 
@@ -211,13 +222,12 @@ const App: React.FC = () => {
 
       setIsRegenerating(true);
       
-      // Mark local segment as processing
       setSegments(prev => prev.map(s => 
           s.id === editingSegment.id ? { ...s, isProcessing: true } : s
       ));
 
       try {
-          const newBlob = await regenerateSticker(editingSegment.blob, editPrompt);
+          const newBlob = await regenerateSticker(editingSegment.blob, editPrompt, settings);
           const newDataUrl = URL.createObjectURL(newBlob);
 
           setSegments(prev => prev.map(s => {
@@ -227,9 +237,6 @@ const App: React.FC = () => {
                       blob: newBlob,
                       dataUrl: newDataUrl,
                       isProcessing: false,
-                      // Optionally update label if modification implied a label change, 
-                      // but keeping old label is usually safer unless we re-run label logic.
-                      // Let's keep old label for now.
                   };
               }
               return s;
@@ -239,7 +246,6 @@ const App: React.FC = () => {
       } catch (err: any) {
           console.error(err);
           setError(err.message || (language === 'zh' ? "重绘失败。" : "Regeneration failed."));
-          // Reset processing state
           setSegments(prev => prev.map(s => 
             s.id === editingSegment.id ? { ...s, isProcessing: false } : s
           ));
@@ -254,6 +260,91 @@ const App: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 pb-20 relative">
+
+      {/* Settings Modal */}
+      {isSettingsOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-in fade-in duration-200">
+              <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden flex flex-col animate-in zoom-in-95 duration-200">
+                  <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+                      <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+                          <SettingsIcon className="w-5 h-5" />
+                          {t.settingsTitle}
+                      </h3>
+                      <button onClick={() => setIsSettingsOpen(false)} className="text-slate-400 hover:text-slate-600">
+                          <X className="w-5 h-5" />
+                      </button>
+                  </div>
+                  <form onSubmit={(e) => {
+                      e.preventDefault();
+                      const formData = new FormData(e.currentTarget);
+                      saveSettings({
+                          provider: formData.get('provider') as any,
+                          apiKey: formData.get('apiKey') as string,
+                          baseUrl: formData.get('baseUrl') as string,
+                          modelName: formData.get('modelName') as string,
+                      });
+                  }} className="p-6 space-y-4">
+                      
+                      {/* Provider */}
+                      <div>
+                          <label className="block text-sm font-medium text-slate-700 mb-1">{t.providerLabel}</label>
+                          <select 
+                             name="provider" 
+                             defaultValue={settings.provider}
+                             className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                          >
+                              <option value="gemini">Google Gemini</option>
+                              <option value="openai">OpenAI / Compatible</option>
+                          </select>
+                      </div>
+
+                      {/* API Key */}
+                      <div>
+                          <label className="block text-sm font-medium text-slate-700 mb-1">{t.apiKeyLabel}</label>
+                          <input 
+                             name="apiKey" 
+                             type="password"
+                             defaultValue={settings.apiKey}
+                             placeholder="sk-..."
+                             required
+                             className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none font-mono"
+                          />
+                      </div>
+
+                      {/* Base URL */}
+                      <div>
+                          <label className="block text-sm font-medium text-slate-700 mb-1">{t.baseUrlLabel}</label>
+                          <input 
+                             name="baseUrl" 
+                             type="text"
+                             defaultValue={settings.baseUrl}
+                             placeholder="https://api.openai.com/v1"
+                             className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none font-mono"
+                          />
+                      </div>
+                      
+                      {/* Model Override (Hidden/Advanced) */}
+                      <div>
+                          <label className="block text-sm font-medium text-slate-700 mb-1">Model Name (Optional)</label>
+                          <input 
+                             name="modelName" 
+                             type="text"
+                             defaultValue={settings.modelName}
+                             placeholder="e.g. gemini-3-pro-image-preview"
+                             className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none font-mono"
+                          />
+                      </div>
+
+                      <div className="pt-2">
+                          <button type="submit" className="w-full bg-indigo-600 text-white py-2.5 rounded-lg font-medium hover:bg-indigo-700 transition-colors shadow-sm flex items-center justify-center gap-2">
+                              <Save className="w-4 h-4" />
+                              {t.saveBtn}
+                          </button>
+                      </div>
+                  </form>
+              </div>
+          </div>
+      )}
 
       {/* Edit Modal */}
       {editingSegment && (
@@ -326,14 +417,15 @@ const App: React.FC = () => {
               {t.titlePart1}<span className="text-indigo-600">{t.titlePart2}</span> AI
             </h1>
           </div>
-          <div className="flex items-center gap-4 text-sm font-medium text-slate-500">
+          <div className="flex items-center gap-3 text-sm font-medium text-slate-500">
              
-             {hasApiKey && (
-                 <div className="hidden sm:flex items-center gap-2 bg-green-50 px-3 py-1 rounded-full border border-green-100 text-green-700">
-                    <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
-                    <span className="text-xs uppercase tracking-wide font-semibold">Gemini AI</span>
-                 </div>
-             )}
+             <button 
+                onClick={() => setIsSettingsOpen(true)}
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-full border transition-all ${hasConfigured ? 'bg-slate-50 border-slate-200 hover:bg-slate-100' : 'bg-indigo-50 border-indigo-200 text-indigo-700 animate-pulse'}`}
+             >
+                 <SettingsIcon className="w-4 h-4" />
+                 <span className="hidden sm:inline">{t.settingsBtn}</span>
+             </button>
              
              <button 
                 onClick={toggleLanguage}
@@ -348,27 +440,27 @@ const App: React.FC = () => {
 
       <main className="max-w-5xl mx-auto px-6 pt-12">
         
-        {/* Auth Check Overlay */}
-        {!hasApiKey && (
+        {/* Not Configured Overlay */}
+        {!hasConfigured && (
             <div className="max-w-lg mx-auto bg-white rounded-2xl shadow-xl p-8 border border-slate-100 text-center animate-in zoom-in duration-300 mt-10">
-                <div className="w-16 h-16 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center mx-auto mb-6">
-                    <KeyRound className="w-8 h-8" />
+                <div className="w-16 h-16 bg-slate-100 text-slate-600 rounded-full flex items-center justify-center mx-auto mb-6">
+                    <SettingsIcon className="w-8 h-8" />
                 </div>
                 <h2 className="text-2xl font-bold text-slate-900 mb-2">{t.authTitle}</h2>
                 <p className="text-slate-600 mb-8">{t.authSubtitle}</p>
                 <button 
-                    onClick={handleSelectKey}
-                    className="w-full bg-indigo-600 text-white py-3 rounded-xl font-semibold hover:bg-indigo-700 transition-all shadow-md flex items-center justify-center gap-2"
+                    onClick={() => setIsSettingsOpen(true)}
+                    className="w-full bg-slate-900 text-white py-3 rounded-xl font-semibold hover:bg-slate-800 transition-all shadow-md flex items-center justify-center gap-2"
                 >
-                    <Sparkles className="w-5 h-5" />
+                    <SettingsIcon className="w-5 h-5" />
                     {t.authBtn}
                 </button>
                 <p className="text-xs text-slate-400 mt-4">{t.authNote}</p>
             </div>
         )}
 
-        {/* Main Content (Only visible if hasApiKey) */}
-        {hasApiKey && (
+        {/* Main Content (Only visible if hasConfigured) */}
+        {hasConfigured && (
           <>
             {/* Intro / Tab Switcher (Only show when idle) */}
             {status === 'idle' && (
@@ -418,7 +510,7 @@ const App: React.FC = () => {
                                 
                                 <div className="grid grid-cols-2 gap-4 mb-5">
                                     {/* Subject Reference */}
-                                    <div className="space-y-2">
+                                    <div className={`space-y-2 ${settings.provider !== 'gemini' ? 'opacity-50 grayscale pointer-events-none' : ''}`}>
                                         <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
                                             <User className="w-3.5 h-3.5" /> {t.refSubject}
                                         </span>
@@ -457,7 +549,7 @@ const App: React.FC = () => {
                                     </div>
 
                                     {/* Style Reference */}
-                                    <div className="space-y-2">
+                                    <div className={`space-y-2 ${settings.provider !== 'gemini' ? 'opacity-50 grayscale pointer-events-none' : ''}`}>
                                         <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
                                             <Paintbrush className="w-3.5 h-3.5" /> {t.refStyle}
                                         </span>
@@ -511,7 +603,7 @@ const App: React.FC = () => {
                                 </div>
                                 <div className="mt-4 flex justify-between items-center">
                                     <span className="text-xs text-slate-400 font-medium bg-slate-100 px-2 py-1 rounded">
-                                        {t.supportsRef}
+                                        {settings.provider === 'gemini' ? t.supportsRef : t.standardGen}
                                     </span>
                                     <button
                                         type="submit"
@@ -558,6 +650,12 @@ const App: React.FC = () => {
                             className="px-4 py-2 bg-white border border-red-200 text-red-600 font-medium rounded-lg hover:bg-red-50 transition-colors"
                         >
                             {t.btnTryAgain}
+                        </button>
+                         <button 
+                            onClick={() => setIsSettingsOpen(true)}
+                            className="px-4 py-2 bg-slate-900 text-white font-medium rounded-lg hover:bg-slate-800 transition-colors"
+                        >
+                            {t.settingsBtn}
                         </button>
                     </div>
                 </div>
