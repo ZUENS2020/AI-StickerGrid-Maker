@@ -505,10 +505,9 @@ const App: React.FC = () => {
                                                         <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
                                                             <User className="w-3.5 h-3.5" /> {t.refSubject}
                                                         </span>
-                                                        <div
-                                                            onClick={() => subjectInputRef.current?.click()}
+                                                        <label
                                                             className={`
-                                                relative h-24 rounded-xl border-2 border-dashed transition-all flex items-center justify-center cursor-pointer overflow-hidden
+                                                relative h-24 rounded-xl border-2 border-dashed transition-all flex items-center justify-center cursor-pointer overflow-hidden block
                                                 ${subjectRef ? 'border-indigo-200 bg-indigo-50' : 'border-slate-200 bg-slate-50 hover:border-indigo-300 hover:bg-slate-100'}
                                             `}
                                                         >
@@ -524,8 +523,12 @@ const App: React.FC = () => {
                                                                     <img src={URL.createObjectURL(subjectRef)} alt="Subject" className="w-full h-full object-cover" />
                                                                     <button
                                                                         type="button"
-                                                                        onClick={(e) => { e.stopPropagation(); setSubjectRef(null); }}
-                                                                        className="absolute top-1 right-1 bg-black/60 text-white p-1 rounded-full hover:bg-red-500 transition-colors"
+                                                                        onClick={(e) => { 
+                                                                            e.preventDefault();
+                                                                            e.stopPropagation(); 
+                                                                            setSubjectRef(null); 
+                                                                        }}
+                                                                        className="absolute top-1 right-1 bg-black/60 text-white p-1 rounded-full hover:bg-red-500 transition-colors z-10"
                                                                     >
                                                                         <X className="w-3 h-3" />
                                                                     </button>
@@ -536,7 +539,7 @@ const App: React.FC = () => {
                                                                     <span className="text-xs font-medium">{t.refSubjectPlaceholder}</span>
                                                                 </div>
                                                             )}
-                                                        </div>
+                                                        </label>
                                                     </div>
 
                                                     {/* Style Reference */}
@@ -544,10 +547,9 @@ const App: React.FC = () => {
                                                         <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
                                                             <Paintbrush className="w-3.5 h-3.5" /> {t.refStyle}
                                                         </span>
-                                                        <div
-                                                            onClick={() => styleInputRef.current?.click()}
+                                                        <label
                                                             className={`
-                                                relative h-24 rounded-xl border-2 border-dashed transition-all flex items-center justify-center cursor-pointer overflow-hidden
+                                                relative h-24 rounded-xl border-2 border-dashed transition-all flex items-center justify-center cursor-pointer overflow-hidden block
                                                 ${styleRef ? 'border-purple-200 bg-purple-50' : 'border-slate-200 bg-slate-50 hover:border-purple-300 hover:bg-slate-100'}
                                             `}
                                                         >
@@ -563,8 +565,12 @@ const App: React.FC = () => {
                                                                     <img src={URL.createObjectURL(styleRef)} alt="Style" className="w-full h-full object-cover" />
                                                                     <button
                                                                         type="button"
-                                                                        onClick={(e) => { e.stopPropagation(); setStyleRef(null); }}
-                                                                        className="absolute top-1 right-1 bg-black/60 text-white p-1 rounded-full hover:bg-red-500 transition-colors"
+                                                                        onClick={(e) => { 
+                                                                            e.preventDefault();
+                                                                            e.stopPropagation(); 
+                                                                            setStyleRef(null); 
+                                                                        }}
+                                                                        className="absolute top-1 right-1 bg-black/60 text-white p-1 rounded-full hover:bg-red-500 transition-colors z-10"
                                                                     >
                                                                         <X className="w-3 h-3" />
                                                                     </button>
@@ -575,7 +581,7 @@ const App: React.FC = () => {
                                                                     <span className="text-xs font-medium">{t.refStylePlaceholder}</span>
                                                                 </div>
                                                             )}
-                                                        </div>
+                                                        </label>
                                                     </div>
                                                 </div>
 

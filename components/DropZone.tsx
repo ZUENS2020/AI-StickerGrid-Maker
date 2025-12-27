@@ -57,13 +57,12 @@ const DropZone: React.FC<DropZoneProps> = ({ onFileSelect, disabled, texts }) =>
   };
 
   return (
-    <div
-      onClick={() => !disabled && fileInputRef.current?.click()}
+    <label
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
       className={`
-        relative overflow-hidden group cursor-pointer
+        relative overflow-hidden group cursor-pointer block
         border-2 border-dashed rounded-2xl p-12 text-center transition-all duration-300
         ${isDragOver 
           ? 'border-indigo-500 bg-indigo-50/50 scale-[1.02]' 
@@ -110,7 +109,7 @@ const DropZone: React.FC<DropZoneProps> = ({ onFileSelect, disabled, texts }) =>
           <span>WEBP</span>
         </div>
       </div>
-    </div>
+    </label>
   );
 };
 
