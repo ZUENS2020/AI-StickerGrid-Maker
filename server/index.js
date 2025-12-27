@@ -13,8 +13,12 @@ app.use(express.json({ limit: '50mb' }));
 
 // Serve static files from the frontend build directory
 const DIST_PATH = path.join(__dirname, '../dist');
+console.log('Checking for static files at:', DIST_PATH);
 if (fs.existsSync(DIST_PATH)) {
+    console.log('Static files found. Serving...');
     app.use(express.static(DIST_PATH));
+} else {
+    console.error('WARNING: dist folder not found at ' + DIST_PATH);
 }
 
 // --- Configuration Management ---
@@ -210,7 +214,16 @@ app.use((req, res, next) => {
     if (fs.existsSync(indexPath)) {
         res.sendFile(indexPath);
     } else {
-        next();
+        res.status(404).send(`
+            <h1>404 - App Not Found</h1>
+            <p>The React frontend application could not be found.</p>
+            <p><strong>Debug Info:</strong></p>
+            <ul>
+                <li>Expected path: ${indexPath}</li>
+                <li>Dist folder exists: ${fs.existsSync(DIST_PATH)}</li>
+            </ul>
+            <p>Please ensure you have run <code>npm run build</code> locally and uploaded the <code>dist</code> folder to the server.</p>
+        `);
     }
 });
 
