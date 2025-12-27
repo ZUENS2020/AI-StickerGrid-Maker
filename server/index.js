@@ -197,7 +197,7 @@ app.post('/api/regenerate', async (req, res) => {
 
 // --- Final catch-all for SPA routing ---
 
-app.get('(.*)', (req, res) => {
+app.get(/^(?!\/api).+/, (req, res) => {
     const indexPath = path.join(DIST_PATH, 'index.html');
     if (fs.existsSync(indexPath)) {
         res.sendFile(indexPath);
