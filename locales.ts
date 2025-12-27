@@ -5,16 +5,15 @@ export const translations = {
     // Header
     titlePart1: "Sticker",
     titlePart2: "Grid",
-    
+
     // Settings
-    settingsTitle: "API Settings",
-    settingsBtn: "Settings",
-    providerLabel: "AI Provider",
-    apiKeyLabel: "API Key",
-    baseUrlLabel: "Base URL (Optional)",
-    saveBtn: "Save Configuration",
+    settingsTitle: "Settings",
+    settingsBtn: "API Settings",
+    apiKeyLabel: "Gemini API Key",
+    baseUrlLabel: "API Base URL (Optional)",
+    saveBtn: "Save Settings",
     configureMsg: "Please configure your API settings to start.",
-    
+
     // Auth (Legacy/Removed, reused for config prompt)
     authTitle: "Configure API",
     authSubtitle: "Enter your API Key to start generating stickers.",
@@ -50,11 +49,11 @@ export const translations = {
     statusProcessingTitle: "Processing your image...",
     statusGeneratingDesc: "Generating artwork...",
     statusProcessingDesc: "Slicing grid and analyzing contents",
-    
+
     // Error
     errorTitle: "Something went wrong",
     btnTryAgain: "Try Again",
-    
+
     // Preview
     previewTitle: "Preview & Edit",
     previewSubtitle: "Review generated tags before downloading.",
@@ -75,14 +74,13 @@ export const translations = {
     titlePart2: "Grid",
 
     // Settings
-    settingsTitle: "API 设置",
-    settingsBtn: "设置",
-    providerLabel: "AI 提供商",
-    apiKeyLabel: "API 密钥",
+    settingsTitle: "设置",
+    settingsBtn: "API 配置",
+    apiKeyLabel: "Gemini API 密钥",
     baseUrlLabel: "API 代理地址 (可选)",
     saveBtn: "保存配置",
     configureMsg: "请先配置 API 设置。",
-    
+
     // Auth
     authTitle: "配置 API",
     authSubtitle: "输入您的 API 密钥以开始生成表情包。",
@@ -118,11 +116,11 @@ export const translations = {
     statusProcessingTitle: "正在处理图片...",
     statusGeneratingDesc: "AI 绘图中...",
     statusProcessingDesc: "正在切片并分析内容",
-    
+
     // Error
     errorTitle: "出错了",
     btnTryAgain: "重试",
-    
+
     // Preview
     previewTitle: "预览与编辑",
     previewSubtitle: "下载前预览并修改标签。",
