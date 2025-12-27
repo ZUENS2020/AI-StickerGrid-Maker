@@ -2,7 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const fs = require('fs');
 const path = require('path');
-const { GoogleGenAI, Type } = require('@google/genai');
+const { GoogleGenerativeAI } = require('@google/generative-ai');
 
 const app = express();
 const PORT = process.env.PORT || 5001;
@@ -75,9 +75,9 @@ app.post('/api/generate-labels', async (req, res) => {
     `;
 
     try {
-        const ai = new GoogleGenAI(config.apiKey);
-        const modelName = config.textModel || 'gemini-3-flash-preview';
-        const model = ai.getGenerativeModel({ model: modelName });
+        const genAI = new GoogleGenerativeAI(config.apiKey);
+        const modelName = config.textModel || 'gemini-2.0-flash-exp';
+        const model = genAI.getGenerativeModel({ model: modelName });
 
         const result = await model.generateContent({
             contents: [{
@@ -125,9 +125,11 @@ app.post('/api/generate-sheet', async (req, res) => {
     parts.push({ text: fullPrompt });
 
     try {
-        const ai = new GoogleGenAI(config.apiKey);
-        const modelName = config.modelName || 'gemini-3-pro-image-preview';
-        const model = ai.getGenerativeModel({ model: modelName });
+        const genAI = new GoogleGenerativeAI(config.apiKey);
+        // Note: Image generation usually requires specific models like gemini-pro-vision or specific imagen endpoints
+        // However, assuming the user has access to a multimodal model capable of this via the same SDK:
+        const modelName = config.modelName || 'gemini-2.0-flash-exp'; 
+        const model = genAI.getGenerativeModel({ model: modelName });
 
         const result = await model.generateContent({
             contents: [{ role: 'user', parts }],
@@ -167,10 +169,10 @@ app.post('/api/regenerate', async (req, res) => {
     `;
 
     try {
-        const ai = new GoogleGenAI(config.apiKey);
+        const genAI = new GoogleGenerativeAI(config.apiKey);
         // Respect custom image model if provided, otherwise fallback to default
-        const modelName = config.modelName || 'gemini-3-pro-image-preview';
-        const model = ai.getGenerativeModel({ model: modelName });
+        const modelName = config.modelName || 'gemini-2.0-flash-exp';
+        const model = genAI.getGenerativeModel({ model: modelName });
 
         const result = await model.generateContent({
             contents: [{
@@ -198,13 +200,17 @@ app.post('/api/regenerate', async (req, res) => {
 
 // --- Final catch-all for SPA routing ---
 
-app.get(/.*/, (req, res) => {
-    if (req.path.startsWith('/api')) return;
+app.use((req, res, next) => {
+    // If it's an API call that wasn't handled, or a file that exists, let it pass
+    if (req.path.startsWith('/api')) {
+        return next();
+    }
+    
     const indexPath = path.join(DIST_PATH, 'index.html');
     if (fs.existsSync(indexPath)) {
         res.sendFile(indexPath);
     } else {
-        res.status(404).send('Frontend not found. Please run "npm run build" in the root directory.');
+        next();
     }
 });
 

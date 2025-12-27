@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useState } from 'react';
 import { Upload, Image as ImageIcon } from 'lucide-react';
 
 interface DropZoneProps {
@@ -14,7 +14,6 @@ interface DropZoneProps {
 
 const DropZone: React.FC<DropZoneProps> = ({ onFileSelect, disabled, texts }) => {
   const [isDragOver, setIsDragOver] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
@@ -46,6 +45,8 @@ const DropZone: React.FC<DropZoneProps> = ({ onFileSelect, disabled, texts }) =>
         onFileSelect(file);
       }
     }
+    // Reset value so same file can be selected again
+    e.target.value = '';
   };
 
   const validateFile = (file: File): boolean => {
@@ -57,13 +58,12 @@ const DropZone: React.FC<DropZoneProps> = ({ onFileSelect, disabled, texts }) =>
   };
 
   return (
-    <label
+    <div
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
       className={`
-        relative overflow-hidden group cursor-pointer block
-        border-2 border-dashed rounded-2xl p-12 text-center transition-all duration-300
+        relative overflow-hidden group border-2 border-dashed rounded-2xl p-12 text-center transition-all duration-300
         ${isDragOver 
           ? 'border-indigo-500 bg-indigo-50/50 scale-[1.02]' 
           : 'border-slate-300 hover:border-indigo-400 hover:bg-slate-50'
@@ -71,16 +71,17 @@ const DropZone: React.FC<DropZoneProps> = ({ onFileSelect, disabled, texts }) =>
         ${disabled ? 'opacity-50 cursor-not-allowed grayscale' : ''}
       `}
     >
+      {/* Invisible Overlay Input - Covers 100% of the area */}
       <input
-        ref={fileInputRef}
         type="file"
-        className="hidden"
+        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20"
         accept="image/png, image/jpeg, image/webp"
         onChange={handleChange}
         disabled={disabled}
+        title=""
       />
       
-      <div className="flex flex-col items-center justify-center space-y-4">
+      <div className="flex flex-col items-center justify-center space-y-4 relative z-10">
         <div className={`
           p-4 rounded-full bg-white shadow-sm ring-1 ring-slate-200 
           transition-transform duration-300 group-hover:scale-110 group-hover:shadow-md
@@ -109,7 +110,7 @@ const DropZone: React.FC<DropZoneProps> = ({ onFileSelect, disabled, texts }) =>
           <span>WEBP</span>
         </div>
       </div>
-    </label>
+    </div>
   );
 };
 
