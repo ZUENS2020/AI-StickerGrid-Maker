@@ -1,5 +1,5 @@
 {
-  "name": "Copy of StickerGrid Splitter AI+AI generate",
+  "name": "StickerGrid Generator",
   "description": "Automatically slice 4x4 sticker sheets into individual files, tag them using Gemini Vision AI, and download as a ZIP archive.",
   "requestFramePermissions": []
 }

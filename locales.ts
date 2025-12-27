@@ -62,8 +62,8 @@ export const translations = {
   },
   zh: {
     // Header
-    titlePart1: "表情包",
-    titlePart2: "工坊",
+    titlePart1: "Sticker",
+    titlePart2: "Grid",
     
     // Auth Screen
     authTitle: "连接 AI Studio",
