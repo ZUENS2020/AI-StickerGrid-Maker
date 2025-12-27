@@ -39,7 +39,7 @@ This guide explains how to deploy the application on an Ubuntu server using PM2.
 // turbo
 4. Start the application with PM2:
    ```bash
-   pm2 start ecosystem.config.js
+   pm2 start ecosystem.config.cjs
    ```
 
 5. Access the app at `http://your-server-ip:5001`.
