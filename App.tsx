@@ -506,7 +506,7 @@ const App: React.FC = () => {
                                                             <User className="w-3.5 h-3.5" /> {t.refSubject}
                                                         </span>
                                                         <div
-                                                            onClick={() => !subjectRef && subjectInputRef.current?.click()}
+                                                            onClick={() => subjectInputRef.current?.click()}
                                                             className={`
                                                 relative h-24 rounded-xl border-2 border-dashed transition-all flex items-center justify-center cursor-pointer overflow-hidden
                                                 ${subjectRef ? 'border-indigo-200 bg-indigo-50' : 'border-slate-200 bg-slate-50 hover:border-indigo-300 hover:bg-slate-100'}
@@ -545,7 +545,7 @@ const App: React.FC = () => {
                                                             <Paintbrush className="w-3.5 h-3.5" /> {t.refStyle}
                                                         </span>
                                                         <div
-                                                            onClick={() => !styleRef && styleInputRef.current?.click()}
+                                                            onClick={() => styleInputRef.current?.click()}
                                                             className={`
                                                 relative h-24 rounded-xl border-2 border-dashed transition-all flex items-center justify-center cursor-pointer overflow-hidden
                                                 ${styleRef ? 'border-purple-200 bg-purple-50' : 'border-slate-200 bg-slate-50 hover:border-purple-300 hover:bg-slate-100'}
