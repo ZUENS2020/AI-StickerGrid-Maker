@@ -1,3 +1,7 @@
+# API Configuration
+server/config.json
+config.json
+
 # Logs
 logs
 *.log
