@@ -18,7 +18,7 @@ export const translations = {
     authTitle: "Configure API",
     authSubtitle: "Enter your API Key to start generating stickers.",
     authBtn: "Open Settings",
-    authNote: "Your key is stored locally in your browser.",
+    authNote: "Your key is stored securely in the server configuration.",
 
     // Hero
     heroTitle1: "Create Sticker Packs",
@@ -85,7 +85,7 @@ export const translations = {
     authTitle: "配置 API",
     authSubtitle: "输入您的 API 密钥以开始生成表情包。",
     authBtn: "打开设置",
-    authNote: "您的密钥仅存储在本地浏览器中。",
+    authNote: "您的密钥将安全存储在服务器配置文件中。",
 
     // Hero
     heroTitle1: "极速制作",

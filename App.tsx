@@ -272,7 +272,7 @@ const App: React.FC = () => {
                                     className="w-full border border-slate-300 p-3 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all" 
                                 />
                                 <p className="text-xs text-slate-500 mt-2">
-                                    {t.authNote || "Your key is stored securely in your browser."}
+                                    {t.authNote || "Your key is stored securely in the server configuration."}
                                 </p>
                             </div>
                             <div className="grid grid-cols-2 gap-4">
