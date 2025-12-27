@@ -10,8 +10,8 @@ import { Sparkles, Grid3X3, Wand2, Upload as UploadIcon, Palette, User, Paintbru
 
 const DEFAULT_SETTINGS: AppSettings = {
     apiKey: '',
-    baseUrl: '',
-    modelName: ''
+    modelName: '',
+    textModel: ''
 };
 
 const App: React.FC = () => {
@@ -283,9 +283,9 @@ const App: React.FC = () => {
                             const formData = new FormData(e.currentTarget);
                             saveSettings({
                                 apiKey: formData.get('apiKey') as string,
-                                baseUrl: formData.get('baseUrl') as string,
                                 modelName: formData.get('modelName') as string,
-                            });
+                                textModel: formData.get('textModel') as string,
+                            } as AppSettings);
                         }} className="p-6 space-y-4">
 
                             {/* API Key */}
@@ -301,26 +301,27 @@ const App: React.FC = () => {
                                 />
                             </div>
 
-                            {/* Base URL */}
-                            <div>
-                                <label className="block text-sm font-medium text-slate-700 mb-1">{t.baseUrlLabel}</label>
-                                <input
-                                    name="baseUrl"
-                                    type="text"
-                                    defaultValue={settings.baseUrl}
-                                    placeholder="https://api.openai.com/v1"
-                                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none font-mono"
-                                />
-                            </div>
 
-                            {/* Model Override (Hidden/Advanced) */}
+                            {/* Image Model */}
                             <div>
-                                <label className="block text-sm font-medium text-slate-700 mb-1">Model Name (Optional)</label>
+                                <label className="block text-sm font-medium text-slate-700 mb-1">Image Model (Optional)</label>
                                 <input
                                     name="modelName"
                                     type="text"
                                     defaultValue={settings.modelName}
                                     placeholder="e.g. gemini-3-pro-image-preview"
+                                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none font-mono"
+                                />
+                            </div>
+
+                            {/* Language Model */}
+                            <div>
+                                <label className="block text-sm font-medium text-slate-700 mb-1">Language Model (Optional)</label>
+                                <input
+                                    name="textModel"
+                                    type="text"
+                                    defaultValue={settings.textModel}
+                                    placeholder="e.g. gemini-2.0-flash-exp"
                                     className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none font-mono"
                                 />
                             </div>
@@ -500,7 +501,7 @@ const App: React.FC = () => {
 
                                                 <div className="grid grid-cols-2 gap-4 mb-5">
                                                     {/* Subject Reference */}
-                                                    <div className={`space-y-2 ${settings.provider !== 'gemini' ? 'opacity-50 grayscale pointer-events-none' : ''}`}>
+                                                    <div className="space-y-2">
                                                         <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
                                                             <User className="w-3.5 h-3.5" /> {t.refSubject}
                                                         </span>
@@ -539,7 +540,7 @@ const App: React.FC = () => {
                                                     </div>
 
                                                     {/* Style Reference */}
-                                                    <div className={`space-y-2 ${settings.provider !== 'gemini' ? 'opacity-50 grayscale pointer-events-none' : ''}`}>
+                                                    <div className="space-y-2">
                                                         <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
                                                             <Paintbrush className="w-3.5 h-3.5" /> {t.refStyle}
                                                         </span>

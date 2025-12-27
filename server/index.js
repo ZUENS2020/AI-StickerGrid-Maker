@@ -24,7 +24,7 @@ const readConfig = () => {
         const data = fs.readFileSync(CONFIG_PATH, 'utf8');
         return JSON.parse(data);
     } catch (err) {
-        return { apiKey: '', baseUrl: '', modelName: '' };
+        return { apiKey: '', modelName: '', textModel: '' };
     }
 };
 
@@ -76,7 +76,7 @@ app.post('/api/generate-labels', async (req, res) => {
 
     try {
         const ai = new GoogleGenAI(config.apiKey);
-        const modelName = config.modelName || 'gemini-3-flash-preview';
+        const modelName = config.textModel || 'gemini-3-flash-preview';
         const model = ai.getGenerativeModel({ model: modelName });
 
         const result = await model.generateContent({
@@ -168,7 +168,8 @@ app.post('/api/regenerate', async (req, res) => {
 
     try {
         const ai = new GoogleGenAI(config.apiKey);
-        const modelName = config.modelName?.includes('gemini-3') ? 'gemini-3-pro-image-preview' : 'gemini-2.5-flash-image';
+        // Respect custom image model if provided, otherwise fallback to default
+        const modelName = config.modelName || 'gemini-3-pro-image-preview';
         const model = ai.getGenerativeModel({ model: modelName });
 
         const result = await model.generateContent({
@@ -197,7 +198,8 @@ app.post('/api/regenerate', async (req, res) => {
 
 // --- Final catch-all for SPA routing ---
 
-app.get(/^(?!\/api).*/, (req, res) => {
+app.get(/.*/, (req, res) => {
+    if (req.path.startsWith('/api')) return;
     const indexPath = path.join(DIST_PATH, 'index.html');
     if (fs.existsSync(indexPath)) {
         res.sendFile(indexPath);

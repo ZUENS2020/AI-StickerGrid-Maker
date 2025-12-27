@@ -1,5 +1,5 @@
 {
-    "apiKey": "",
-    "baseUrl": "",
-    "modelName": ""
+  "apiKey": "AIzaSyAf-UfzfSZEl74ydoKhuP3PsFQJPNuTxWQ",
+  "modelName": "gemini-3-pro-image-preview",
+  "textModel": "gemini-3-flash-preview"
 }

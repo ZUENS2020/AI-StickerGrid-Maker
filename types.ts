@@ -17,6 +17,6 @@ export type Language = 'en' | 'zh';
 
 export interface AppSettings {
   apiKey: string;
-  baseUrl: string; // Optional, for proxies
-  modelName?: string; // Optional override
+  modelName?: string; // Optional override (Image Model)
+  textModel?: string; // Optional override (Language Model)
 }
