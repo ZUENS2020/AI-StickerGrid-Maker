@@ -11,6 +11,12 @@ const CONFIG_PATH = path.join(__dirname, 'config.json');
 app.use(cors());
 app.use(express.json({ limit: '50mb' }));
 
+// Serve static files from the frontend build directory
+const DIST_PATH = path.join(__dirname, '../dist');
+if (fs.existsSync(DIST_PATH)) {
+    app.use(express.static(DIST_PATH));
+}
+
 // --- Configuration Management ---
 
 const readConfig = () => {
@@ -186,6 +192,17 @@ app.post('/api/regenerate', async (req, res) => {
     } catch (err) {
         console.error(err);
         res.status(500).json({ error: err.message });
+    }
+});
+
+// --- Final catch-all for SPA routing ---
+
+app.get('*', (req, res) => {
+    const indexPath = path.join(DIST_PATH, 'index.html');
+    if (fs.existsSync(indexPath)) {
+        res.sendFile(indexPath);
+    } else {
+        res.status(404).send('Frontend not found. Please run "npm run build" in the root directory.');
     }
 });
 

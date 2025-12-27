@@ -1,0 +1,9 @@
+services:
+  stickergrid:
+    build: .
+    container_name: stickergrid-app
+    ports:
+      - "5001:5001"
+    volumes:
+      - ./server/config.json:/app/server/config.json
+    restart: always
