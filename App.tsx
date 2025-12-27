@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import JSZip from 'jszip';
 import DropZone from './components/DropZone';
 import GridPreview from './components/GridPreview';
@@ -37,6 +37,10 @@ const App: React.FC = () => {
     const [editingSegment, setEditingSegment] = useState<StickerSegment | null>(null);
     const [editPrompt, setEditPrompt] = useState('');
     const [isRegenerating, setIsRegenerating] = useState(false);
+
+    // Refs for hidden file inputs
+    const subjectInputRef = useRef<HTMLInputElement>(null);
+    const styleInputRef = useRef<HTMLInputElement>(null);
 
     // Derived translations
     const t = translations[language];
@@ -189,7 +193,15 @@ const App: React.FC = () => {
             if (type === 'subject') setSubjectRef(file);
             else setStyleRef(file);
         }
-        e.target.value = '';
+        e.target.value = ''; // Reset input so same file can be selected again
+    };
+
+    const triggerFileSelect = (type: 'subject' | 'style') => {
+        if (type === 'subject') {
+            subjectInputRef.current?.click();
+        } else {
+            styleInputRef.current?.click();
+        }
     };
 
     // --- Edit Logic ---
@@ -230,14 +242,14 @@ const App: React.FC = () => {
         <div className="min-h-screen bg-slate-50 text-slate-900 font-sans pb-20">
             {/* --- Settings Modal --- */}
             {isSettingsOpen && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60">
-                    <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-6 animate-in zoom-in-95">
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+                    <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 animate-in zoom-in-95 border border-slate-100">
                         <div className="flex justify-between items-center mb-6">
-                            <h3 className="text-xl font-bold flex items-center gap-2">
-                                <SettingsIcon className="w-5 h-5" /> {t.settingsTitle}
+                            <h3 className="text-xl font-bold flex items-center gap-2 text-slate-800">
+                                <SettingsIcon className="w-5 h-5 text-indigo-600" /> {t.settingsTitle}
                             </h3>
-                            <button onClick={() => setIsSettingsOpen(false)} className="text-slate-500 hover:text-black">
-                                <X className="w-6 h-6" />
+                            <button onClick={() => setIsSettingsOpen(false)} className="text-slate-400 hover:text-slate-600 hover:bg-slate-100 p-2 rounded-full transition-colors">
+                                <X className="w-5 h-5" />
                             </button>
                         </div>
                         <form onSubmit={(e) => {
@@ -248,20 +260,32 @@ const App: React.FC = () => {
                                 modelName: formData.get('modelName') as string,
                                 textModel: formData.get('textModel') as string,
                             } as AppSettings);
-                        }} className="space-y-4">
+                        }} className="space-y-5">
                             <div>
-                                <label className="block text-sm font-semibold mb-1">{t.apiKeyLabel}</label>
-                                <input name="apiKey" type="password" defaultValue={settings.apiKey} placeholder="sk-..." required className="w-full border p-2 rounded" />
+                                <label className="block text-sm font-semibold mb-2 text-slate-700">{t.apiKeyLabel}</label>
+                                <input 
+                                    name="apiKey" 
+                                    type="password" 
+                                    defaultValue={settings.apiKey} 
+                                    placeholder="sk-..." 
+                                    required 
+                                    className="w-full border border-slate-300 p-3 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all" 
+                                />
+                                <p className="text-xs text-slate-500 mt-2">
+                                    {t.authNote || "Your key is stored securely in your browser."}
+                                </p>
                             </div>
-                            <div>
-                                <label className="block text-sm font-semibold mb-1">Image Model</label>
-                                <input name="modelName" type="text" defaultValue={settings.modelName} placeholder="gemini-2.0-flash-exp" className="w-full border p-2 rounded" />
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-xs font-semibold mb-1 text-slate-500 uppercase tracking-wider">Image Model</label>
+                                    <input name="modelName" type="text" defaultValue={settings.modelName} placeholder="gemini-2.0-flash-exp" className="w-full border border-slate-200 bg-slate-50 p-2 rounded text-sm focus:ring-1 focus:ring-indigo-500 outline-none" />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-semibold mb-1 text-slate-500 uppercase tracking-wider">Text Model</label>
+                                    <input name="textModel" type="text" defaultValue={settings.textModel} placeholder="gemini-2.0-flash-exp" className="w-full border border-slate-200 bg-slate-50 p-2 rounded text-sm focus:ring-1 focus:ring-indigo-500 outline-none" />
+                                </div>
                             </div>
-                            <div>
-                                <label className="block text-sm font-semibold mb-1">Text Model</label>
-                                <input name="textModel" type="text" defaultValue={settings.textModel} placeholder="gemini-2.0-flash-exp" className="w-full border p-2 rounded" />
-                            </div>
-                            <button type="submit" className="w-full bg-indigo-600 text-white py-2 rounded font-bold hover:bg-indigo-700">
+                            <button type="submit" className="w-full bg-indigo-600 text-white py-3 rounded-lg font-bold hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-200">
                                 {t.saveBtn}
                             </button>
                         </form>
@@ -271,24 +295,34 @@ const App: React.FC = () => {
 
             {/* --- Edit Modal --- */}
             {editingSegment && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60">
-                    <div className="bg-white rounded-lg shadow-xl w-full max-w-lg p-6 animate-in zoom-in-95">
-                        <div className="flex justify-between items-center mb-4">
-                            <h3 className="text-xl font-bold">{t.editTitle}</h3>
-                            <button onClick={closeEditModal}><X className="w-6 h-6" /></button>
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6 animate-in zoom-in-95 border border-slate-100">
+                        <div className="flex justify-between items-center mb-6 border-b border-slate-100 pb-4">
+                            <div>
+                                <h3 className="text-lg font-bold text-slate-900">{t.editTitle}</h3>
+                                <p className="text-sm text-slate-500">{t.editSubtitle}</p>
+                            </div>
+                            <button onClick={closeEditModal} className="text-slate-400 hover:text-slate-600 hover:bg-slate-100 p-2 rounded-full"><X className="w-5 h-5" /></button>
                         </div>
-                        <div className="flex gap-4 mb-4">
-                            <img src={editingSegment.dataUrl} className="w-24 h-24 object-contain bg-slate-100 border rounded" />
-                            <textarea
-                                value={editPrompt}
-                                onChange={(e) => setEditPrompt(e.target.value)}
-                                placeholder={t.editPromptPlaceholder}
-                                className="flex-1 border p-2 rounded h-24 resize-none"
-                            />
+                        <div className="flex gap-6 mb-6">
+                            <div className="w-32 h-32 flex-shrink-0 bg-slate-50 rounded-xl border border-slate-200 p-2 flex items-center justify-center">
+                                <img src={editingSegment.dataUrl} className="w-full h-full object-contain" />
+                            </div>
+                            <div className="flex-1">
+                                <label className="block text-sm font-semibold mb-2 text-slate-700">Instruction</label>
+                                <textarea
+                                    value={editPrompt}
+                                    onChange={(e) => setEditPrompt(e.target.value)}
+                                    placeholder={t.editPromptPlaceholder}
+                                    className="w-full h-32 border border-slate-300 p-3 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none resize-none text-sm"
+                                    autoFocus
+                                />
+                            </div>
                         </div>
-                        <div className="flex justify-end gap-2">
-                            <button onClick={closeEditModal} className="px-4 py-2 border rounded hover:bg-slate-100">{t.btnCancel}</button>
-                            <button onClick={handleRegenerateSticker} disabled={isRegenerating || !editPrompt.trim()} className="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 disabled:opacity-50">
+                        <div className="flex justify-end gap-3 pt-2">
+                            <button onClick={closeEditModal} className="px-5 py-2.5 border border-slate-200 rounded-lg text-slate-600 font-medium hover:bg-slate-50 transition-colors">{t.btnCancel}</button>
+                            <button onClick={handleRegenerateSticker} disabled={isRegenerating || !editPrompt.trim()} className="px-5 py-2.5 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed shadow-md shadow-indigo-100 flex items-center gap-2">
+                                {isRegenerating ? <Sparkles className="w-4 h-4 animate-spin" /> : <Wand2 className="w-4 h-4" />}
                                 {isRegenerating ? 'Generating...' : t.btnRegenerate}
                             </button>
                         </div>
@@ -297,150 +331,188 @@ const App: React.FC = () => {
             )}
 
             {/* --- Header --- */}
-            <header className="bg-white border-b sticky top-0 z-40 px-6 py-3 flex items-center justify-between shadow-sm">
-                <div className="flex items-center gap-2 text-xl font-bold">
-                    <Grid3X3 className="w-6 h-6 text-indigo-600" />
-                    <span>{t.titlePart1}<span className="text-indigo-600">{t.titlePart2}</span> AI</span>
-                </div>
-                <div className="flex items-center gap-3">
-                    <button onClick={() => setIsSettingsOpen(true)} className={`p-2 rounded-full border ${hasConfigured ? 'bg-white' : 'bg-red-50 border-red-200 text-red-500'}`}>
-                        <SettingsIcon className="w-5 h-5" />
-                    </button>
-                    <button onClick={toggleLanguage} className="p-2 hover:bg-slate-100 rounded-full">
-                        <Languages className="w-5 h-5" />
-                    </button>
+            <header className="bg-white/80 backdrop-blur-md sticky top-0 z-40 border-b border-slate-100">
+                <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
+                    <div className="flex items-center gap-2.5">
+                        <div className="bg-indigo-600 p-1.5 rounded-lg text-white">
+                            <Grid3X3 className="w-5 h-5" />
+                        </div>
+                        <span className="text-lg font-bold tracking-tight text-slate-900">
+                            {t.titlePart1}<span className="text-indigo-600">{t.titlePart2}</span> AI
+                        </span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                        <button 
+                            onClick={() => setIsSettingsOpen(true)} 
+                            className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium border transition-all ${hasConfigured ? 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100' : 'bg-red-50 border-red-200 text-red-600 animate-pulse'}`}
+                        >
+                            <SettingsIcon className="w-3.5 h-3.5" />
+                            {hasConfigured ? t.settingsBtn : t.configureMsg}
+                        </button>
+                        <button onClick={toggleLanguage} className="p-2 hover:bg-slate-100 rounded-full text-slate-500 hover:text-slate-900 transition-colors">
+                            <Languages className="w-5 h-5" />
+                        </button>
+                    </div>
                 </div>
             </header>
 
             {/* --- Main Content --- */}
-            <main className="max-w-5xl mx-auto px-4 py-8">
+            <main className="max-w-4xl mx-auto px-6 py-12">
                 {!hasConfigured ? (
-                    <div className="text-center py-20">
-                        <h2 className="text-2xl font-bold mb-4">{t.authTitle}</h2>
-                        <button onClick={() => setIsSettingsOpen(true)} className="bg-indigo-600 text-white px-6 py-3 rounded-lg font-bold hover:bg-indigo-700">
-                            {t.authBtn}
+                    <div className="text-center py-24 px-4">
+                        <div className="w-20 h-20 bg-indigo-50 rounded-3xl flex items-center justify-center mx-auto mb-8 rotate-3 shadow-lg shadow-indigo-100">
+                            <SettingsIcon className="w-10 h-10 text-indigo-600" />
+                        </div>
+                        <h2 className="text-3xl font-extrabold text-slate-900 mb-4 tracking-tight">{t.authTitle}</h2>
+                        <p className="text-slate-500 max-w-md mx-auto mb-8 text-lg leading-relaxed">{t.authSubtitle}</p>
+                        <button onClick={() => setIsSettingsOpen(true)} className="bg-indigo-600 text-white px-8 py-3.5 rounded-xl font-bold hover:bg-indigo-700 transition-all shadow-xl shadow-indigo-200 hover:-translate-y-0.5 flex items-center gap-2 mx-auto">
+                            {t.authBtn} <ArrowRight className="w-5 h-5" />
                         </button>
                     </div>
                 ) : (
                     <>
                         {/* Only show upload/generate options if NOT processing/complete */}
                         {status === 'idle' && (
-                            <div className="mb-8">
-                                <div className="flex justify-center gap-4 mb-8">
+                            <div className="animate-in fade-in slide-in-from-bottom-4 duration-700">
+                                <div className="text-center mb-12">
+                                    <h1 className="text-5xl font-black text-slate-900 mb-4 tracking-tight leading-tight">
+                                        {t.heroTitle1} <br/>
+                                        <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-violet-600">{t.heroTitle2}</span>
+                                    </h1>
+                                    <p className="text-slate-500 text-lg max-w-2xl mx-auto">{t.heroSubtitle}</p>
+                                </div>
+
+                                <div className="flex justify-center gap-2 mb-10 bg-white p-1.5 rounded-full shadow-sm border border-slate-200 w-fit mx-auto">
                                     <button
                                         onClick={() => setMode('upload')}
-                                        className={`px-6 py-2 rounded-full font-bold transition-all ${mode === 'upload' ? 'bg-slate-900 text-white' : 'bg-white text-slate-500 border'}`}
+                                        className={`px-6 py-2.5 rounded-full font-bold text-sm transition-all flex items-center gap-2 ${mode === 'upload' ? 'bg-slate-900 text-white shadow-md' : 'text-slate-500 hover:bg-slate-50'}`}
                                     >
-                                        {t.modeUpload}
+                                        <UploadIcon className="w-4 h-4" /> {t.modeUpload}
                                     </button>
                                     <button
                                         onClick={() => setMode('generate')}
-                                        className={`px-6 py-2 rounded-full font-bold transition-all ${mode === 'generate' ? 'bg-indigo-600 text-white' : 'bg-white text-slate-500 border'}`}
+                                        className={`px-6 py-2.5 rounded-full font-bold text-sm transition-all flex items-center gap-2 ${mode === 'generate' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-500 hover:bg-slate-50'}`}
                                     >
-                                        {t.modeGenerate}
+                                        <Sparkles className="w-4 h-4" /> {t.modeGenerate}
                                     </button>
                                 </div>
 
                                 {mode === 'upload' ? (
-                                    <DropZone
-                                        onFileSelect={handleFileSelect}
-                                        disabled={false}
-                                        texts={{
-                                            title: t.dropTitle,
-                                            subtitle: t.dropSubtitle,
-                                            drag: t.dropDrag,
-                                            error: t.dropError
-                                        }}
-                                    />
+                                    <div className="max-w-2xl mx-auto">
+                                        <DropZone
+                                            onFileSelect={handleFileSelect}
+                                            disabled={false}
+                                            texts={{
+                                                title: t.dropTitle,
+                                                subtitle: t.dropSubtitle,
+                                                drag: t.dropDrag,
+                                                error: t.dropError
+                                            }}
+                                        />
+                                    </div>
                                 ) : (
-                                    <div className="bg-white p-6 rounded-xl shadow-sm border">
+                                    <div className="bg-white p-8 rounded-3xl shadow-xl shadow-slate-200/50 border border-white">
                                         <form onSubmit={handleGenerate}>
-                                            <div className="grid md:grid-cols-2 gap-6 mb-6">
-                                                {/* Subject Reference - SIMPLIFIED LAYOUT */}
-                                                <div className="border rounded-lg p-4 bg-slate-50">
-                                                    <div className="flex items-center gap-2 mb-2 font-semibold text-sm text-slate-700">
-                                                        <User className="w-4 h-4" /> {t.refSubject}
+                                            <div className="grid md:grid-cols-2 gap-6 mb-8">
+                                                {/* Subject Reference */}
+                                                <div>
+                                                    <div className="flex items-center gap-2 mb-3 text-xs font-bold text-slate-400 uppercase tracking-wider">
+                                                        <User className="w-3.5 h-3.5" /> {t.refSubject}
                                                     </div>
-                                                    
+                                                    <input 
+                                                        ref={subjectInputRef}
+                                                        type="file" 
+                                                        accept="image/*" 
+                                                        className="hidden" 
+                                                        onChange={(e) => handleRefUpload(e, 'subject')} 
+                                                    />
                                                     {!subjectRef ? (
-                                                        // Native input is visible but styled
-                                                        <input 
-                                                            type="file" 
-                                                            accept="image/*" 
-                                                            onChange={(e) => handleRefUpload(e, 'subject')}
-                                                            className="block w-full text-sm text-slate-500
-                                                                file:mr-4 file:py-2 file:px-4
-                                                                file:rounded-full file:border-0
-                                                                file:text-sm file:font-semibold
-                                                                file:bg-indigo-50 file:text-indigo-700
-                                                                hover:file:bg-indigo-100
-                                                                cursor-pointer"
-                                                        />
+                                                        <div 
+                                                            onClick={() => triggerFileSelect('subject')}
+                                                            className="h-32 border-2 border-dashed border-slate-200 rounded-2xl flex flex-col items-center justify-center cursor-pointer hover:border-indigo-400 hover:bg-indigo-50/50 transition-all group"
+                                                        >
+                                                            <div className="bg-slate-100 p-3 rounded-full mb-2 group-hover:bg-white group-hover:shadow-sm transition-all">
+                                                                <Plus className="w-5 h-5 text-slate-400 group-hover:text-indigo-500" />
+                                                            </div>
+                                                            <span className="text-sm font-medium text-slate-400 group-hover:text-indigo-600">{t.refSubjectPlaceholder}</span>
+                                                        </div>
                                                     ) : (
-                                                        <div className="relative group w-24 h-24">
-                                                            <img src={URL.createObjectURL(subjectRef)} className="w-full h-full object-cover rounded-lg border" />
-                                                            <button 
-                                                                type="button"
-                                                                onClick={() => setSubjectRef(null)}
-                                                                className="absolute -top-2 -right-2 bg-red-500 text-white p-1 rounded-full shadow hover:bg-red-600"
-                                                            >
-                                                                <X className="w-3 h-3" />
-                                                            </button>
+                                                        <div className="relative group h-32 rounded-2xl overflow-hidden border border-slate-200">
+                                                            <img src={URL.createObjectURL(subjectRef)} className="w-full h-full object-cover" />
+                                                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                                                                <button type="button" onClick={() => setSubjectRef(null)} className="p-2 bg-white/20 hover:bg-red-500 rounded-full text-white backdrop-blur-sm transition-colors">
+                                                                    <X className="w-5 h-5" />
+                                                                </button>
+                                                            </div>
                                                         </div>
                                                     )}
                                                 </div>
 
-                                                {/* Style Reference - SIMPLIFIED LAYOUT */}
-                                                <div className="border rounded-lg p-4 bg-slate-50">
-                                                    <div className="flex items-center gap-2 mb-2 font-semibold text-sm text-slate-700">
-                                                        <Paintbrush className="w-4 h-4" /> {t.refStyle}
+                                                {/* Style Reference */}
+                                                <div>
+                                                    <div className="flex items-center gap-2 mb-3 text-xs font-bold text-slate-400 uppercase tracking-wider">
+                                                        <Paintbrush className="w-3.5 h-3.5" /> {t.refStyle}
                                                     </div>
-
+                                                    <input 
+                                                        ref={styleInputRef}
+                                                        type="file" 
+                                                        accept="image/*" 
+                                                        className="hidden" 
+                                                        onChange={(e) => handleRefUpload(e, 'style')} 
+                                                    />
                                                     {!styleRef ? (
-                                                         <input 
-                                                            type="file" 
-                                                            accept="image/*" 
-                                                            onChange={(e) => handleRefUpload(e, 'style')}
-                                                            className="block w-full text-sm text-slate-500
-                                                                file:mr-4 file:py-2 file:px-4
-                                                                file:rounded-full file:border-0
-                                                                file:text-sm file:font-semibold
-                                                                file:bg-purple-50 file:text-purple-700
-                                                                hover:file:bg-purple-100
-                                                                cursor-pointer"
-                                                        />
+                                                        <div 
+                                                            onClick={() => triggerFileSelect('style')}
+                                                            className="h-32 border-2 border-dashed border-slate-200 rounded-2xl flex flex-col items-center justify-center cursor-pointer hover:border-purple-400 hover:bg-purple-50/50 transition-all group"
+                                                        >
+                                                            <div className="bg-slate-100 p-3 rounded-full mb-2 group-hover:bg-white group-hover:shadow-sm transition-all">
+                                                                <Plus className="w-5 h-5 text-slate-400 group-hover:text-purple-500" />
+                                                            </div>
+                                                            <span className="text-sm font-medium text-slate-400 group-hover:text-purple-600">{t.refStylePlaceholder}</span>
+                                                        </div>
                                                     ) : (
-                                                        <div className="relative group w-24 h-24">
-                                                            <img src={URL.createObjectURL(styleRef)} className="w-full h-full object-cover rounded-lg border" />
-                                                            <button 
-                                                                type="button"
-                                                                onClick={() => setStyleRef(null)}
-                                                                className="absolute -top-2 -right-2 bg-red-500 text-white p-1 rounded-full shadow hover:bg-red-600"
-                                                            >
-                                                                <X className="w-3 h-3" />
-                                                            </button>
+                                                        <div className="relative group h-32 rounded-2xl overflow-hidden border border-slate-200">
+                                                            <img src={URL.createObjectURL(styleRef)} className="w-full h-full object-cover" />
+                                                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                                                                <button type="button" onClick={() => setStyleRef(null)} className="p-2 bg-white/20 hover:bg-red-500 rounded-full text-white backdrop-blur-sm transition-colors">
+                                                                    <X className="w-5 h-5" />
+                                                                </button>
+                                                            </div>
                                                         </div>
                                                     )}
                                                 </div>
                                             </div>
 
-                                            <label className="block font-semibold mb-2">{t.promptLabel}</label>
-                                            <textarea
-                                                value={prompt}
-                                                onChange={(e) => setPrompt(e.target.value)}
-                                                placeholder={t.promptPlaceholder}
-                                                className="w-full h-32 p-3 border rounded-lg mb-4 focus:ring-2 focus:ring-indigo-500 outline-none"
-                                                required
-                                            />
+                                            <div className="mb-6">
+                                                <label className="block text-sm font-bold text-slate-700 mb-2">{t.promptLabel}</label>
+                                                <div className="relative">
+                                                    <textarea
+                                                        value={prompt}
+                                                        onChange={(e) => setPrompt(e.target.value)}
+                                                        placeholder={t.promptPlaceholder}
+                                                        className="w-full h-40 p-5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-indigo-500 focus:bg-white outline-none resize-none transition-all text-lg"
+                                                        required
+                                                    />
+                                                    <div className="absolute bottom-4 right-4 text-slate-400">
+                                                        <Palette className="w-5 h-5" />
+                                                    </div>
+                                                </div>
+                                            </div>
                                             
-                                            <button 
-                                                type="submit" 
-                                                disabled={!prompt.trim() || isGenerating}
-                                                className="bg-indigo-600 text-white px-8 py-3 rounded-lg font-bold hover:bg-indigo-700 disabled:opacity-50 flex items-center gap-2 ml-auto"
-                                            >
-                                                {isGenerating ? <Sparkles className="w-5 h-5 animate-spin" /> : <Wand2 className="w-5 h-5" />}
-                                                {t.btnGenerate}
-                                            </button>
+                                            <div className="flex items-center justify-between pt-4 border-t border-slate-100">
+                                                <div className="flex items-center gap-2 text-xs font-semibold text-slate-400 bg-slate-50 px-3 py-1.5 rounded-lg">
+                                                    <ImageIcon className="w-3.5 h-3.5" />
+                                                    {t.supportsRef}
+                                                </div>
+                                                <button 
+                                                    type="submit" 
+                                                    disabled={!prompt.trim() || isGenerating}
+                                                    className="bg-gradient-to-r from-indigo-600 to-violet-600 text-white px-8 py-3.5 rounded-xl font-bold hover:shadow-lg hover:shadow-indigo-200 disabled:opacity-50 hover:-translate-y-0.5 transition-all flex items-center gap-2"
+                                                >
+                                                    {isGenerating ? <Sparkles className="w-5 h-5 animate-spin" /> : <Wand2 className="w-5 h-5" />}
+                                                    {t.btnGenerate}
+                                                </button>
+                                            </div>
                                         </form>
                                     </div>
                                 )}
@@ -449,20 +521,28 @@ const App: React.FC = () => {
 
                         {/* Processing Status */}
                         {(status === 'slicing' || status === 'analyzing') && (
-                            <div className="text-center py-20">
-                                <div className="w-16 h-16 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin mx-auto mb-4"></div>
-                                <h3 className="text-xl font-bold">{isGenerating ? t.statusGeneratingTitle : t.statusProcessingTitle}</h3>
-                                <p className="text-slate-500">{isGenerating ? t.statusGeneratingDesc : t.statusProcessingDesc}</p>
+                            <div className="text-center py-24 animate-in fade-in zoom-in duration-500">
+                                <div className="relative w-24 h-24 mx-auto mb-8">
+                                    <div className="absolute inset-0 border-4 border-indigo-100 rounded-full"></div>
+                                    <div className="absolute inset-0 border-4 border-indigo-600 rounded-full border-t-transparent animate-spin"></div>
+                                    <div className="absolute inset-0 flex items-center justify-center">
+                                        <Sparkles className="w-8 h-8 text-indigo-600 animate-pulse" />
+                                    </div>
+                                </div>
+                                <h3 className="text-2xl font-black text-slate-900 mb-2">{isGenerating ? t.statusGeneratingTitle : t.statusProcessingTitle}</h3>
+                                <p className="text-slate-500 text-lg">{isGenerating ? t.statusGeneratingDesc : t.statusProcessingDesc}</p>
                             </div>
                         )}
 
                         {/* Error */}
                         {status === 'error' && (
-                            <div className="bg-red-50 text-red-700 p-6 rounded-lg text-center border border-red-200">
-                                <FileWarning className="w-12 h-12 mx-auto mb-2" />
-                                <h3 className="font-bold text-lg">{t.errorTitle}</h3>
-                                <p className="mb-4">{error}</p>
-                                <button onClick={handleReset} className="bg-white border border-red-200 px-4 py-2 rounded font-semibold">
+                            <div className="max-w-md mx-auto bg-red-50 text-red-800 p-8 rounded-3xl text-center border border-red-100 shadow-xl shadow-red-50">
+                                <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-sm text-red-500 text-3xl">
+                                    <FileWarning />
+                                </div>
+                                <h3 className="font-bold text-xl mb-2">{t.errorTitle}</h3>
+                                <p className="mb-6 opacity-80">{error}</p>
+                                <button onClick={handleReset} className="bg-white border border-red-200 px-6 py-2.5 rounded-xl font-bold hover:bg-red-50 transition-colors shadow-sm text-red-600">
                                     {t.btnTryAgain}
                                 </button>
                             </div>
@@ -470,21 +550,23 @@ const App: React.FC = () => {
 
                         {/* Results */}
                         {segments.length > 0 && status === 'complete' && (
-                            <GridPreview
-                                segments={segments}
-                                onUpdateLabel={handleUpdateLabel}
-                                onDownloadAll={handleDownload}
-                                onReset={handleReset}
-                                onEditSticker={openEditModal}
-                                isProcessing={false}
-                                texts={{
-                                    title: t.previewTitle,
-                                    subtitle: t.previewSubtitle,
-                                    reset: t.btnReset,
-                                    download: t.btnDownload,
-                                    labelPlaceholder: t.labelPlaceholder
-                                }}
-                            />
+                            <div className="animate-in fade-in slide-in-from-bottom-8 duration-700">
+                                <GridPreview
+                                    segments={segments}
+                                    onUpdateLabel={handleUpdateLabel}
+                                    onDownloadAll={handleDownload}
+                                    onReset={handleReset}
+                                    onEditSticker={openEditModal}
+                                    isProcessing={false}
+                                    texts={{
+                                        title: t.previewTitle,
+                                        subtitle: t.previewSubtitle,
+                                        reset: t.btnReset,
+                                        download: t.btnDownload,
+                                        labelPlaceholder: t.labelPlaceholder
+                                    }}
+                                />
+                            </div>
                         )}
                     </>
                 )}
