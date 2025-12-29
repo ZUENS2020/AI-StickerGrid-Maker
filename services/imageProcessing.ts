@@ -88,12 +88,81 @@ export const fileToBase64 = (file: File): Promise<string> => {
     reader.readAsDataURL(file);
     reader.onload = () => {
         const result = reader.result as string;
-        // Remove data:image/png;base64, prefix if present for Gemini API usually, 
-        // but the SDK helper usually takes raw base64 data. 
+        // Remove data:image/png;base64, prefix if present for Gemini API usually,
+        // but the SDK helper usually takes raw base64 data.
         // The SDK inlineData expects just the base64 string without the mime prefix.
         const base64Data = result.split(',')[1];
         resolve(base64Data);
     };
     reader.onerror = error => reject(error);
+  });
+};
+
+/**
+ * Get the dimensions (width x height) of an image blob
+ */
+export const getImageDimensions = (blob: Blob): Promise<{ width: number; height: number }> => {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const url = URL.createObjectURL(blob);
+
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      resolve({ width: img.width, height: img.height });
+    };
+
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error('Failed to load image'));
+    };
+
+    img.src = url;
+  });
+};
+
+/**
+ * Resize an image blob to a target square size using Canvas
+ * Used for downscaling images when target size is smaller than current
+ */
+export const resizeImage = (blob: Blob, targetSize: number): Promise<Blob> => {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const url = URL.createObjectURL(blob);
+
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+
+      const canvas = document.createElement('canvas');
+      canvas.width = targetSize;
+      canvas.height = targetSize;
+
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        reject(new Error('Could not get canvas context'));
+        return;
+      }
+
+      // Use better quality scaling
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
+
+      // Draw image scaled to target size
+      ctx.drawImage(img, 0, 0, targetSize, targetSize);
+
+      canvas.toBlob((resultBlob) => {
+        if (resultBlob) {
+          resolve(resultBlob);
+        } else {
+          reject(new Error('Failed to create blob from canvas'));
+        }
+      }, 'image/png');
+    };
+
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error('Failed to load image'));
+    };
+
+    img.src = url;
   });
 };

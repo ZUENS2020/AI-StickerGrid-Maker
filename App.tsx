@@ -2,11 +2,11 @@ import React, { useState, useCallback, useEffect, useRef } from 'react';
 import JSZip from 'jszip';
 import DropZone from './components/DropZone';
 import GridPreview from './components/GridPreview';
-import { sliceImage } from './services/imageProcessing';
-import { StickerSegment, ProcessingStatus, Language, AppSettings } from './types';
-import { getServerConfig, saveServerConfig, generateStickerLabels, generateStickerSheet, regenerateSticker } from './services/geminiService';
+import { sliceImage, getImageDimensions, resizeImage } from './services/imageProcessing';
+import { StickerSegment, ProcessingStatus, Language, AppSettings, ResolutionPreset } from './types';
+import { getServerConfig, saveServerConfig, generateStickerLabels, generateStickerSheet, regenerateSticker, upscaleImage } from './services/geminiService';
 import { translations } from './locales';
-import { Sparkles, Grid3X3, Wand2, Upload as UploadIcon, Palette, User, Paintbrush, Plus, X, FileWarning, Languages, Settings as SettingsIcon, ArrowRight, Save, Image as ImageIcon } from 'lucide-react';
+import { Sparkles, Grid3X3, Wand2, Upload as UploadIcon, Palette, User, Paintbrush, Plus, X, FileWarning, Languages, Settings as SettingsIcon, ArrowRight, Save, Image as ImageIcon, Maximize } from 'lucide-react';
 
 const DEFAULT_SETTINGS: AppSettings = {
     apiKey: '',
@@ -38,9 +38,22 @@ const App: React.FC = () => {
     const [editPrompt, setEditPrompt] = useState('');
     const [isRegenerating, setIsRegenerating] = useState(false);
 
+    // Resolution State
+    const [selectedResolution, setSelectedResolution] = useState<ResolutionPreset | null>(null);
+    const [currentDimensions, setCurrentDimensions] = useState<{ width: number; height: number } | null>(null);
+    const [isAdjustingResolution, setIsAdjustingResolution] = useState(false);
+
+    // Image Upload State
+    const [uploadedImage, setUploadedImage] = useState<File | null>(null);
+    const [uploadedImageUrl, setUploadedImageUrl] = useState<string | null>(null);
+
+    // Resolution presets
+    const resolutionPresets: ResolutionPreset[] = [256, 512, 1024, 2048];
+
     // Refs for hidden file inputs
     const subjectInputRef = useRef<HTMLInputElement>(null);
     const styleInputRef = useRef<HTMLInputElement>(null);
+    const editImageInputRef = useRef<HTMLInputElement>(null);
 
     // Derived translations
     const t = translations[language];
@@ -205,15 +218,36 @@ const App: React.FC = () => {
     };
 
     // --- Edit Logic ---
-    const openEditModal = (segment: StickerSegment) => {
+    const openEditModal = async (segment: StickerSegment) => {
         setEditingSegment(segment);
         setEditPrompt('');
         setIsRegenerating(false);
+        setSelectedResolution(null);
+        setIsAdjustingResolution(false);
+        setUploadedImage(null);
+        setUploadedImageUrl(null);
+
+        // Get current image dimensions
+        try {
+            const dimensions = await getImageDimensions(segment.blob);
+            setCurrentDimensions(dimensions);
+        } catch (err) {
+            console.error('Failed to get image dimensions', err);
+            setCurrentDimensions(null);
+        }
     };
 
     const closeEditModal = () => {
         setEditingSegment(null);
         setEditPrompt('');
+        setSelectedResolution(null);
+        setCurrentDimensions(null);
+        setIsAdjustingResolution(false);
+        setUploadedImage(null);
+        if (uploadedImageUrl) {
+            URL.revokeObjectURL(uploadedImageUrl);
+            setUploadedImageUrl(null);
+        }
     };
 
     const handleRegenerateSticker = async () => {
@@ -235,6 +269,91 @@ const App: React.FC = () => {
             setError(err.message || (language === 'zh' ? "重绘失败。" : "Regeneration failed."));
             setSegments(prev => prev.map(s => s.id === editingSegment.id ? { ...s, isProcessing: false } : s));
             setIsRegenerating(false);
+        }
+    };
+
+    const handleApplyResolution = async () => {
+        if (!editingSegment || !selectedResolution || !currentDimensions) return;
+
+        setIsAdjustingResolution(true);
+        setSegments(prev => prev.map(s => s.id === editingSegment.id ? { ...s, isProcessing: true } : s));
+
+        try {
+            let newBlob: Blob;
+            const currentWidth = currentDimensions.width;
+
+            if (selectedResolution > currentWidth) {
+                // Use AI to upscale
+                newBlob = await upscaleImage(editingSegment.blob, selectedResolution, settings);
+            } else {
+                // Use Canvas to downscale
+                newBlob = await resizeImage(editingSegment.blob, selectedResolution);
+            }
+
+            const newDataUrl = URL.createObjectURL(newBlob);
+            setSegments(prev => prev.map(s => {
+                if (s.id === editingSegment.id) {
+                    return { ...s, blob: newBlob, dataUrl: newDataUrl, isProcessing: false };
+                }
+                return s;
+            }));
+            closeEditModal();
+        } catch (err: any) {
+            console.error(err);
+            setError(err.message || (language === 'zh' ? "分辨率调整失败。" : "Failed to adjust resolution."));
+            setSegments(prev => prev.map(s => s.id === editingSegment.id ? { ...s, isProcessing: false } : s));
+            setIsAdjustingResolution(false);
+        }
+    };
+
+    const handleEditImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (e.target.files && e.target.files.length > 0) {
+            const file = e.target.files[0];
+            if (!file.type.startsWith('image/')) {
+                setError(language === 'zh' ? '请上传图片文件。' : 'Please upload an image file.');
+                return;
+            }
+            setUploadedImage(file);
+
+            // Revoke previous URL if exists
+            if (uploadedImageUrl) {
+                URL.revokeObjectURL(uploadedImageUrl);
+            }
+
+            // Create new URL for preview
+            const newUrl = URL.createObjectURL(file);
+            setUploadedImageUrl(newUrl);
+        }
+        // Reset input
+        e.target.value = '';
+    };
+
+    const triggerEditImageUpload = () => {
+        editImageInputRef.current?.click();
+    };
+
+    const handleApplyUploadedImage = async () => {
+        if (!editingSegment || !uploadedImage) return;
+
+        setIsAdjustingResolution(true);
+        setSegments(prev => prev.map(s => s.id === editingSegment.id ? { ...s, isProcessing: true } : s));
+
+        try {
+            const newBlob = uploadedImage;
+            const newDataUrl = uploadedImageUrl || editingSegment.dataUrl;
+
+            setSegments(prev => prev.map(s => {
+                if (s.id === editingSegment.id) {
+                    return { ...s, blob: newBlob, dataUrl: newDataUrl, isProcessing: false };
+                }
+                return s;
+            }));
+            closeEditModal();
+        } catch (err: any) {
+            console.error(err);
+            setError(err.message || (language === 'zh' ? "图片上传失败。" : "Failed to upload image."));
+            setSegments(prev => prev.map(s => s.id === editingSegment.id ? { ...s, isProcessing: false } : s));
+            setIsAdjustingResolution(false);
         }
     };
 
@@ -304,6 +423,8 @@ const App: React.FC = () => {
                             </div>
                             <button onClick={closeEditModal} className="text-slate-400 hover:text-slate-600 hover:bg-slate-100 p-2 rounded-full"><X className="w-5 h-5" /></button>
                         </div>
+
+                        {/* Instruction Section */}
                         <div className="flex gap-6 mb-6">
                             <div className="w-32 h-32 flex-shrink-0 bg-slate-50 rounded-xl border border-slate-200 p-2 flex items-center justify-center">
                                 <img src={editingSegment.dataUrl} className="w-full h-full object-contain" />
@@ -319,12 +440,70 @@ const App: React.FC = () => {
                                 />
                             </div>
                         </div>
+
+                        {/* Resolution Section */}
+                        <div className="mb-6 p-4 bg-slate-50 rounded-xl border border-slate-200">
+                            <div className="flex items-center justify-between mb-3">
+                                <label className="flex items-center gap-2 text-sm font-semibold text-slate-700">
+                                    <Maximize className="w-4 h-4" />
+                                    {t.resolutionLabel}
+                                </label>
+                                {currentDimensions && (
+                                    <span className="text-xs text-slate-500 bg-white px-2 py-1 rounded-md border border-slate-200">
+                                        {t.currentResolution.replace('{w}', String(currentDimensions.width)).replace('{h}', String(currentDimensions.height))}
+                                    </span>
+                                )}
+                            </div>
+                            <div className="grid grid-cols-4 gap-2">
+                                {resolutionPresets.map((preset) => {
+                                    const isSelected = selectedResolution === preset;
+                                    const isUpscale = currentDimensions && preset > currentDimensions.width;
+                                    return (
+                                        <button
+                                            key={preset}
+                                            onClick={() => setSelectedResolution(preset)}
+                                            className={`
+                                                py-2 px-3 rounded-lg text-sm font-medium transition-all relative
+                                                ${isSelected
+                                                    ? 'bg-indigo-600 text-white shadow-md shadow-indigo-100'
+                                                    : 'bg-white text-slate-600 border border-slate-200 hover:border-indigo-300 hover:bg-indigo-50'
+                                                }
+                                            `}
+                                        >
+                                            <div className="flex flex-col items-center gap-1">
+                                                <span className="font-bold">{preset}x{preset}</span>
+                                                {isUpscale && (
+                                                    <span className="text-[10px] opacity-75">AI</span>
+                                                )}
+                                            </div>
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        </div>
+
+                        {/* Action Buttons */}
                         <div className="flex justify-end gap-3 pt-2">
                             <button onClick={closeEditModal} className="px-5 py-2.5 border border-slate-200 rounded-lg text-slate-600 font-medium hover:bg-slate-50 transition-colors">{t.btnCancel}</button>
-                            <button onClick={handleRegenerateSticker} disabled={isRegenerating || !editPrompt.trim()} className="px-5 py-2.5 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed shadow-md shadow-indigo-100 flex items-center gap-2">
-                                {isRegenerating ? <Sparkles className="w-4 h-4 animate-spin" /> : <Wand2 className="w-4 h-4" />}
-                                {isRegenerating ? 'Generating...' : t.btnRegenerate}
-                            </button>
+                            {selectedResolution ? (
+                                <button
+                                    onClick={handleApplyResolution}
+                                    disabled={isAdjustingResolution}
+                                    className="px-5 py-2.5 bg-gradient-to-r from-indigo-600 to-violet-600 text-white rounded-lg font-medium hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed shadow-md flex items-center gap-2"
+                                >
+                                    {isAdjustingResolution ? <Sparkles className="w-4 h-4 animate-spin" /> : <Maximize className="w-4 h-4" />}
+                                    {isAdjustingResolution ? t.processingResolution : t.btnApplyResolution}
+                                </button>
+                            ) : (
+                                <button
+                                    onClick={handleRegenerateSticker}
+                                    disabled={isRegenerating || !editPrompt.trim()}
+                                    className="px-5 py-2.5 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed shadow-md shadow-indigo-100 flex items-center gap-2"
+                                >
+                                    {isRegenerating ? <Sparkles className="w-4 h-4 animate-spin" /> : <Wand2 className="w-4 h-4" />}
+                                    {isRegenerating ? 'Generating...' : t.btnRegenerate}
+                                </button>
+                            )}
                         </div>
                     </div>
                 </div>

@@ -67,6 +67,17 @@ export const translations = {
     editPromptPlaceholder: "e.g. Make the character wink, Change the hat color to red...",
     btnCancel: "Cancel",
     btnRegenerate: "Regenerate",
+
+    // Resolution
+    resolutionLabel: "Resolution",
+    currentResolution: "Current: {w}x{h}",
+    btnApplyResolution: "Apply Resolution",
+    processingResolution: "Adjusting resolution...",
+
+    // Image Upload in Edit
+    uploadImageLabel: "Or upload a replacement",
+    uploadImageBtn: "Choose Image",
+    uploadImageHint: "Upload an image to replace this sticker",
   },
   zh: {
     // Header
@@ -134,5 +145,16 @@ export const translations = {
     editPromptPlaceholder: "例如：让角色眨眼，把帽子改成红色...",
     btnCancel: "取消",
     btnRegenerate: "重新生成",
+
+    // Resolution
+    resolutionLabel: "分辨率",
+    currentResolution: "当前: {w}x{h}",
+    btnApplyResolution: "应用分辨率",
+    processingResolution: "正在调整分辨率...",
+
+    // Image Upload in Edit
+    uploadImageLabel: "或上传替换图片",
+    uploadImageBtn: "选择图片",
+    uploadImageHint: "上传一张图片来替换当前贴纸",
   }
 };

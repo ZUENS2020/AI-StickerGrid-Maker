@@ -203,6 +203,54 @@ app.post('/api/regenerate', async (req, res) => {
     }
 });
 
+app.post('/api/upscale', async (req, res) => {
+    const { imageBase64, targetSize } = req.body;
+    const config = readConfig();
+
+    if (!config.apiKey) return res.status(400).json({ error: "API Key not configured on server" });
+
+    const fullPrompt = `
+        Upscale this sticker image to ${targetSize}x${targetSize} pixels.
+
+        CRITICAL STYLE INSTRUCTIONS:
+        1. Maintain the exact same art style, colors, and details as the original image.
+        2. Output MUST be ${targetSize}x${targetSize} pixels with a TRANSPARENT background.
+        3. Enhance details and sharpness appropriate for the higher resolution.
+        4. Do NOT alter the design, only improve quality and resolution.
+    `;
+
+    try {
+        const genAI = new GoogleGenerativeAI(config.apiKey);
+        const modelName = config.modelName || 'gemini-3-pro-image-preview';
+        const model = genAI.getGenerativeModel({ model: modelName });
+
+        const result = await model.generateContent({
+            contents: [{
+                role: 'user',
+                parts: [
+                    { inlineData: { mimeType: "image/png", data: cleanBase64(imageBase64) } },
+                    { text: fullPrompt }
+                ]
+            }],
+            generationConfig: {
+                // @ts-ignore
+                imageConfig: {
+                    aspectRatio: "1:1",
+                    imageSize: targetSize >= 1024 ? "4K" : "HD"
+                }
+            }
+        });
+
+        const part = result.response.candidates[0].content.parts.find(p => p.inlineData);
+        if (!part) throw new Error("No image generated");
+
+        res.json({ imageBase64: part.inlineData.data });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
 // --- Final catch-all for SPA routing ---
 
 app.use((req, res, next) => {

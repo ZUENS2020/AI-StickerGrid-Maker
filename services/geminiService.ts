@@ -116,6 +116,31 @@ export const regenerateSticker = async (
     return base64ToBlob(data.imageBase64);
 };
 
+export const upscaleImage = async (
+    imageBlob: Blob,
+    targetSize: number,
+    _settings: any
+): Promise<Blob> => {
+    const base64Data = await blobToBase64(imageBlob);
+
+    const response = await fetch('/api/upscale', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            imageBase64: base64Data,
+            targetSize: targetSize
+        })
+    });
+
+    if (!response.ok) {
+        const err = await response.json();
+        throw new Error(err.error || "Failed to upscale image");
+    }
+
+    const data = await response.json();
+    return base64ToBlob(data.imageBase64);
+};
+
 // --- Config Helpers ---
 
 export const getServerConfig = async () => {

@@ -20,3 +20,5 @@ export interface AppSettings {
   modelName?: string; // Optional override (Image Model)
   textModel?: string; // Optional override (Language Model)
 }
+
+export type ResolutionPreset = 256 | 512 | 1024 | 2048;
