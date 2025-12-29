@@ -424,10 +424,19 @@ const App: React.FC = () => {
                             <button onClick={closeEditModal} className="text-slate-400 hover:text-slate-600 hover:bg-slate-100 p-2 rounded-full"><X className="w-5 h-5" /></button>
                         </div>
 
-                        {/* Instruction Section */}
+                        {/* Preview & Upload Section */}
                         <div className="flex gap-6 mb-6">
-                            <div className="w-32 h-32 flex-shrink-0 bg-slate-50 rounded-xl border border-slate-200 p-2 flex items-center justify-center">
-                                <img src={editingSegment.dataUrl} className="w-full h-full object-contain" />
+                            <div className="relative group">
+                                <div className="w-32 h-32 flex-shrink-0 bg-slate-50 rounded-xl border border-slate-200 p-2 flex items-center justify-center overflow-hidden">
+                                    <img src={uploadedImageUrl || editingSegment.dataUrl} className="w-full h-full object-contain" />
+                                </div>
+                                {/* Upload overlay */}
+                                <div
+                                    onClick={triggerEditImageUpload}
+                                    className="absolute inset-0 bg-black/50 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center cursor-pointer"
+                                >
+                                    <UploadIcon className="w-6 h-6 text-white" />
+                                </div>
                             </div>
                             <div className="flex-1">
                                 <label className="block text-sm font-semibold mb-2 text-slate-700">Instruction</label>
@@ -435,11 +444,49 @@ const App: React.FC = () => {
                                     value={editPrompt}
                                     onChange={(e) => setEditPrompt(e.target.value)}
                                     placeholder={t.editPromptPlaceholder}
-                                    className="w-full h-32 border border-slate-300 p-3 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none resize-none text-sm"
+                                    className="w-full h-24 border border-slate-300 p-3 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none resize-none text-sm"
                                     autoFocus
+                                />
+                                <button
+                                    type="button"
+                                    onClick={triggerEditImageUpload}
+                                    className="mt-2 text-xs text-indigo-600 hover:text-indigo-700 font-medium flex items-center gap-1"
+                                >
+                                    <UploadIcon className="w-3 h-3" />
+                                    {t.uploadImageBtn}
+                                </button>
+                                <input
+                                    ref={editImageInputRef}
+                                    type="file"
+                                    accept="image/*"
+                                    className="hidden"
+                                    onChange={handleEditImageUpload}
                                 />
                             </div>
                         </div>
+
+                        {/* Uploaded Image Preview Bar */}
+                        {uploadedImage && (
+                            <div className="mb-4 p-3 bg-indigo-50 rounded-lg border border-indigo-200 flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                    <ImageIcon className="w-4 h-4 text-indigo-600" />
+                                    <span className="text-sm text-indigo-800 font-medium">{uploadedImage.name}</span>
+                                    <span className="text-xs text-indigo-500">({Math.round(uploadedImage.size / 1024)}KB)</span>
+                                </div>
+                                <button
+                                    onClick={() => {
+                                        setUploadedImage(null);
+                                        if (uploadedImageUrl) {
+                                            URL.revokeObjectURL(uploadedImageUrl);
+                                            setUploadedImageUrl(null);
+                                        }
+                                    }}
+                                    className="text-slate-400 hover:text-red-500 p-1 rounded"
+                                >
+                                    <X className="w-4 h-4" />
+                                </button>
+                            </div>
+                        )}
 
                         {/* Resolution Section */}
                         <div className="mb-6 p-4 bg-slate-50 rounded-xl border border-slate-200">
@@ -485,7 +532,16 @@ const App: React.FC = () => {
                         {/* Action Buttons */}
                         <div className="flex justify-end gap-3 pt-2">
                             <button onClick={closeEditModal} className="px-5 py-2.5 border border-slate-200 rounded-lg text-slate-600 font-medium hover:bg-slate-50 transition-colors">{t.btnCancel}</button>
-                            {selectedResolution ? (
+                            {uploadedImage ? (
+                                <button
+                                    onClick={handleApplyUploadedImage}
+                                    disabled={isAdjustingResolution}
+                                    className="px-5 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-lg font-medium hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed shadow-md flex items-center gap-2"
+                                >
+                                    {isAdjustingResolution ? <Sparkles className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                                    {isAdjustingResolution ? (language === 'zh' ? '处理中...' : 'Processing...') : (language === 'zh' ? '应用图片' : 'Apply Image')}
+                                </button>
+                            ) : selectedResolution ? (
                                 <button
                                     onClick={handleApplyResolution}
                                     disabled={isAdjustingResolution}
