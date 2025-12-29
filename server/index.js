@@ -80,7 +80,7 @@ app.post('/api/generate-labels', async (req, res) => {
 
     try {
         const genAI = new GoogleGenerativeAI(config.apiKey);
-        const modelName = config.textModel || 'gemini-2.0-flash-exp';
+        const modelName = config.textModel || 'gemini-3-flash-preview';
         const model = genAI.getGenerativeModel({ model: modelName });
 
         const result = await model.generateContent({
@@ -110,9 +110,10 @@ app.post('/api/generate-sheet', async (req, res) => {
 
     if (!config.apiKey) return res.status(400).json({ error: "API Key not configured on server" });
 
-    let fullPrompt = `Create a high-quality 4x4 grid sticker sheet containing 16 distinct stickers based on this description: "${prompt}". 
-    The output MUST be a perfect 4x4 grid layout with clear spacing between items on a solid white background. 
-    Ensure the stickers are completely separate and do not overlap the grid lines. 
+    let fullPrompt = `Create a high-quality 4x4 grid sticker sheet containing 16 distinct stickers based on this description: "${prompt}".
+    The output MUST be a perfect 4x4 grid layout with clear spacing between items on a TRANSPARENT background.
+    Ensure the stickers are completely separate and do not overlap the grid lines.
+    CRITICAL: Use transparent (not white) background so stickers can be easily extracted.
     Style: Vector illustration, vibrant colors, clear outlines.`;
 
     const parts = [];
@@ -132,7 +133,7 @@ app.post('/api/generate-sheet', async (req, res) => {
         const genAI = new GoogleGenerativeAI(config.apiKey);
         // Note: Image generation usually requires specific models like gemini-pro-vision or specific imagen endpoints
         // However, assuming the user has access to a multimodal model capable of this via the same SDK:
-        const modelName = config.modelName || 'gemini-2.0-flash-exp'; 
+        const modelName = config.modelName || 'gemini-3-pro-image-preview'; 
         const model = genAI.getGenerativeModel({ model: modelName });
 
         const result = await model.generateContent({
@@ -164,18 +165,18 @@ app.post('/api/regenerate', async (req, res) => {
 
     const fullPrompt = `
         Modify this input sticker image based strictly on this instruction: "${prompt}".
-        
+
         CRITICAL STYLE INSTRUCTIONS:
         1. Maintain the exact same art style (Vector illustration, vibrant colors, clear outlines) as the input image.
         2. Keep the character/object consistent, only apply the requested change.
-        3. Output MUST be a single sticker element on a clean white background.
+        3. Output MUST be a single sticker element on a TRANSPARENT background.
         4. Do NOT output a grid, just the single modified sticker.
     `;
 
     try {
         const genAI = new GoogleGenerativeAI(config.apiKey);
         // Respect custom image model if provided, otherwise fallback to default
-        const modelName = config.modelName || 'gemini-2.0-flash-exp';
+        const modelName = config.modelName || 'gemini-3-pro-image-preview';
         const model = genAI.getGenerativeModel({ model: modelName });
 
         const result = await model.generateContent({
