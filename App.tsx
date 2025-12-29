@@ -6,7 +6,7 @@ import { sliceImage, getImageDimensions, resizeImage } from './services/imagePro
 import { StickerSegment, ProcessingStatus, Language, AppSettings, ResolutionPreset } from './types';
 import { getServerConfig, saveServerConfig, generateStickerLabels, generateStickerSheet, regenerateSticker, upscaleImage } from './services/geminiService';
 import { translations } from './locales';
-import { Sparkles, Grid3X3, Wand2, Upload as UploadIcon, Palette, User, Paintbrush, Plus, X, FileWarning, Languages, Settings as SettingsIcon, ArrowRight, Save, Image as ImageIcon, Maximize } from 'lucide-react';
+import { Sparkles, Grid3X3, Wand2, Upload as UploadIcon, Palette, User, Paintbrush, Plus, X, FileWarning, Languages, Settings as SettingsIcon, ArrowRight, Save, Image as ImageIcon, Maximize, Maximize2 } from 'lucide-react';
 
 const DEFAULT_SETTINGS: AppSettings = {
     apiKey: '',
@@ -42,6 +42,12 @@ const App: React.FC = () => {
     const [selectedResolution, setSelectedResolution] = useState<ResolutionPreset | null>(null);
     const [currentDimensions, setCurrentDimensions] = useState<{ width: number; height: number } | null>(null);
     const [isAdjustingResolution, setIsAdjustingResolution] = useState(false);
+
+    // Batch Resolution State
+    const [isBatchResolutionOpen, setIsBatchResolutionOpen] = useState(false);
+    const [batchSelectedResolution, setBatchSelectedResolution] = useState<ResolutionPreset | null>(null);
+    const [isBatchProcessing, setIsBatchProcessing] = useState(false);
+    const [batchProcessingIndex, setBatchProcessingIndex] = useState(0);
 
     // Image Upload State
     const [uploadedImage, setUploadedImage] = useState<File | null>(null);
@@ -357,6 +363,60 @@ const App: React.FC = () => {
         }
     };
 
+    const handleBatchResolutionApply = async () => {
+        if (!batchSelectedResolution) return;
+
+        setIsBatchProcessing(true);
+        setBatchProcessingIndex(0);
+
+        const updatedSegments = [...segments];
+
+        for (let i = 0; i < updatedSegments.length; i++) {
+            setBatchProcessingIndex(i + 1);
+            const segment = updatedSegments[i];
+
+            try {
+                const dimensions = await getImageDimensions(segment.blob);
+                let newBlob: Blob;
+
+                if (batchSelectedResolution > dimensions.width) {
+                    // Use AI to upscale
+                    newBlob = await upscaleImage(segment.blob, batchSelectedResolution, settings);
+                } else {
+                    // Use Canvas to downscale
+                    newBlob = await resizeImage(segment.blob, batchSelectedResolution);
+                }
+
+                const newDataUrl = URL.createObjectURL(newBlob);
+                updatedSegments[i] = { ...segment, blob: newBlob, dataUrl: newDataUrl, isProcessing: false };
+
+                // Update UI progressively
+                setSegments([...updatedSegments]);
+            } catch (err: any) {
+                console.error(`Failed to process sticker ${segment.id}:`, err);
+                updatedSegments[i] = { ...segment, isProcessing: false };
+                setSegments([...updatedSegments]);
+            }
+        }
+
+        setIsBatchProcessing(false);
+        setBatchSelectedResolution(null);
+        setIsBatchResolutionOpen(false);
+    };
+
+    const openBatchResolutionModal = async () => {
+        setBatchSelectedResolution(null);
+        setIsBatchProcessing(false);
+        setBatchProcessingIndex(0);
+        setIsBatchResolutionOpen(true);
+    };
+
+    const closeBatchResolutionModal = () => {
+        setBatchSelectedResolution(null);
+        setIsBatchProcessing(false);
+        setIsBatchResolutionOpen(false);
+    };
+
     return (
         <div className="min-h-screen bg-slate-50 text-slate-900 font-sans pb-20">
             {/* --- Settings Modal --- */}
@@ -560,6 +620,93 @@ const App: React.FC = () => {
                                     {isRegenerating ? 'Generating...' : t.btnRegenerate}
                                 </button>
                             )}
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* --- Batch Resolution Modal --- */}
+            {isBatchResolutionOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 animate-in zoom-in-95 border border-slate-100">
+                        <div className="flex justify-between items-center mb-6 border-b border-slate-100 pb-4">
+                            <div>
+                                <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                                    <Maximize2 className="w-5 h-5 text-indigo-600" />
+                                    {t.batchResolutionTitle}
+                                </h3>
+                                <p className="text-sm text-slate-500">{t.batchResolutionSubtitle}</p>
+                            </div>
+                            <button onClick={closeBatchResolutionModal} className="text-slate-400 hover:text-slate-600 hover:bg-slate-100 p-2 rounded-full"><X className="w-5 h-5" /></button>
+                        </div>
+
+                        {/* Processing Progress */}
+                        {isBatchProcessing && (
+                            <div className="mb-6 p-4 bg-indigo-50 rounded-xl border border-indigo-200">
+                                <div className="flex items-center justify-between mb-2">
+                                    <span className="text-sm font-medium text-indigo-800">
+                                        {t.batchResolutionProcessing.replace('{current}', String(batchProcessingIndex)).replace('{total}', String(segments.length))}
+                                    </span>
+                                    <Sparkles className="w-4 h-4 text-indigo-600 animate-spin" />
+                                </div>
+                                <div className="w-full bg-indigo-200 rounded-full h-2">
+                                    <div
+                                        className="bg-indigo-600 h-2 rounded-full transition-all duration-300"
+                                        style={{ width: `${(batchProcessingIndex / segments.length) * 100}%` }}
+                                    />
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Resolution Options */}
+                        <div className={`mb-6 p-4 bg-slate-50 rounded-xl border border-slate-200 ${isBatchProcessing ? 'opacity-50 pointer-events-none' : ''}`}>
+                            <label className="block text-sm font-semibold text-slate-700 mb-3">{t.resolutionLabel}</label>
+                            <div className="grid grid-cols-2 gap-3">
+                                {resolutionPresets.map((preset) => {
+                                    const isSelected = batchSelectedResolution === preset;
+                                    return (
+                                        <button
+                                            key={preset}
+                                            onClick={() => !isBatchProcessing && setBatchSelectedResolution(preset)}
+                                            disabled={isBatchProcessing}
+                                            className={`
+                                                py-3 px-4 rounded-xl text-sm font-medium transition-all relative
+                                                ${isSelected
+                                                    ? 'bg-indigo-600 text-white shadow-md shadow-indigo-100'
+                                                    : 'bg-white text-slate-600 border border-slate-200 hover:border-indigo-300 hover:bg-indigo-50'
+                                                }
+                                                ${isBatchProcessing ? 'cursor-not-allowed opacity-60' : ''}
+                                            `}
+                                        >
+                                            <div className="flex flex-col items-center gap-1">
+                                                <span className="font-bold text-lg">{preset}x{preset}</span>
+                                                {isSelected && (
+                                                    <span className="text-[10px] opacity-75">{language === 'zh' ? '已选择' : 'Selected'}</span>
+                                                )}
+                                            </div>
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        </div>
+
+                        {/* Action Buttons */}
+                        <div className="flex justify-end gap-3 pt-2">
+                            <button
+                                onClick={closeBatchResolutionModal}
+                                disabled={isBatchProcessing}
+                                className="px-5 py-2.5 border border-slate-200 rounded-lg text-slate-600 font-medium hover:bg-slate-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                {t.btnCancel}
+                            </button>
+                            <button
+                                onClick={handleBatchResolutionApply}
+                                disabled={!batchSelectedResolution || isBatchProcessing}
+                                className="px-5 py-2.5 bg-gradient-to-r from-indigo-600 to-violet-600 text-white rounded-lg font-medium hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed shadow-md flex items-center gap-2"
+                            >
+                                {isBatchProcessing ? <Sparkles className="w-4 h-4 animate-spin" /> : <Maximize2 className="w-4 h-4" />}
+                                {isBatchProcessing ? t.processingResolution : t.batchResolutionApply}
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -792,13 +939,15 @@ const App: React.FC = () => {
                                     onDownloadAll={handleDownload}
                                     onReset={handleReset}
                                     onEditSticker={openEditModal}
+                                    onBatchResolution={openBatchResolutionModal}
                                     isProcessing={false}
                                     texts={{
                                         title: t.previewTitle,
                                         subtitle: t.previewSubtitle,
                                         reset: t.btnReset,
                                         download: t.btnDownload,
-                                        labelPlaceholder: t.labelPlaceholder
+                                        labelPlaceholder: t.labelPlaceholder,
+                                        batchResolutionBtn: t.batchResolutionBtn
                                     }}
                                 />
                             </div>

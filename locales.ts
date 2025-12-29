@@ -74,6 +74,15 @@ export const translations = {
     btnApplyResolution: "Apply Resolution",
     processingResolution: "Adjusting resolution...",
 
+    // Batch Resolution
+    batchResolutionTitle: "Batch Resolution",
+    batchResolutionSubtitle: "Adjust resolution for all stickers at once.",
+    batchResolutionBtn: "Batch Resolution",
+    batchResolutionApply: "Apply to All",
+    batchResolutionProcessing: "Processing {current}/{total}...",
+    batchResolutionComplete: "All stickers updated!",
+    mixedResolutionWarning: "Stickers have different resolutions.",
+
     // Image Upload in Edit
     uploadImageLabel: "Or upload a replacement",
     uploadImageBtn: "Choose Image",
@@ -151,6 +160,15 @@ export const translations = {
     currentResolution: "当前: {w}x{h}",
     btnApplyResolution: "应用分辨率",
     processingResolution: "正在调整分辨率...",
+
+    // Batch Resolution
+    batchResolutionTitle: "批量调整分辨率",
+    batchResolutionSubtitle: "一次性调整所有贴纸的分辨率。",
+    batchResolutionBtn: "批量调整分辨率",
+    batchResolutionApply: "应用到全部",
+    batchResolutionProcessing: "处理中 {current}/{total}...",
+    batchResolutionComplete: "所有贴纸已更新！",
+    mixedResolutionWarning: "贴纸分辨率不一致。",
 
     // Image Upload in Edit
     uploadImageLabel: "或上传替换图片",

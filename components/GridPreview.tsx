@@ -1,6 +1,6 @@
 import React from 'react';
 import { StickerSegment } from '../types';
-import { Download, RefreshCw, X, Pencil } from 'lucide-react';
+import { Download, RefreshCw, X, Pencil, Maximize2 } from 'lucide-react';
 
 interface GridPreviewProps {
   segments: StickerSegment[];
@@ -8,6 +8,7 @@ interface GridPreviewProps {
   onDownloadAll: () => void;
   onReset: () => void;
   onEditSticker: (segment: StickerSegment) => void;
+  onBatchResolution: () => void;
   isProcessing: boolean;
   texts: {
       title: string;
@@ -15,17 +16,19 @@ interface GridPreviewProps {
       reset: string;
       download: string;
       labelPlaceholder: string;
+      batchResolutionBtn: string;
   };
 }
 
-const GridPreview: React.FC<GridPreviewProps> = ({ 
-  segments, 
-  onUpdateLabel, 
-  onDownloadAll, 
+const GridPreview: React.FC<GridPreviewProps> = ({
+  segments,
+  onUpdateLabel,
+  onDownloadAll,
   onReset,
   onEditSticker,
+  onBatchResolution,
   isProcessing,
-  texts 
+  texts
 }) => {
   return (
     <div className="w-full max-w-4xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -35,6 +38,15 @@ const GridPreview: React.FC<GridPreviewProps> = ({
           <p className="text-slate-500 text-sm">{texts.subtitle}</p>
         </div>
         <div className="flex gap-3">
+          <button
+            onClick={onBatchResolution}
+            disabled={isProcessing}
+            className="flex items-center gap-2 px-4 py-2 text-slate-600 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 hover:text-violet-600 transition-colors shadow-sm font-medium text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+            title="Adjust resolution for all stickers"
+          >
+            <Maximize2 className="w-4 h-4" />
+            {texts.batchResolutionBtn}
+          </button>
           <button
             onClick={onReset}
             className="flex items-center gap-2 px-4 py-2 text-slate-600 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 hover:text-red-600 transition-colors shadow-sm font-medium text-sm"
