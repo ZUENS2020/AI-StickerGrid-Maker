@@ -111,9 +111,9 @@ app.post('/api/generate-sheet', async (req, res) => {
     if (!config.apiKey) return res.status(400).json({ error: "API Key not configured on server" });
 
     let fullPrompt = `Create a high-quality 4x4 grid sticker sheet containing 16 distinct stickers based on this description: "${prompt}".
-    The output MUST be a perfect 4x4 grid layout with clear spacing between items on a TRANSPARENT background.
+    The output MUST be a perfect 4x4 grid layout with clear spacing between items on a WHITE background.
     Ensure the stickers are completely separate and do not overlap the grid lines.
-    CRITICAL: Use transparent (not white) background so stickers can be easily extracted.
+    CRITICAL: Use white background so stickers can be easily extracted.
     Style: Vector illustration, vibrant colors, clear outlines.`;
 
     const parts = [];
@@ -169,7 +169,7 @@ app.post('/api/regenerate', async (req, res) => {
         CRITICAL STYLE INSTRUCTIONS:
         1. Maintain the exact same art style (Vector illustration, vibrant colors, clear outlines) as the input image.
         2. Keep the character/object consistent, only apply the requested change.
-        3. Output MUST be a single sticker element on a TRANSPARENT background.
+        3. Output MUST be a single sticker element on a WHITE background.
         4. Do NOT output a grid, just the single modified sticker.
     `;
 
@@ -214,7 +214,7 @@ app.post('/api/upscale', async (req, res) => {
 
         CRITICAL STYLE INSTRUCTIONS:
         1. Maintain the exact same art style, colors, and details as the original image.
-        2. Output MUST be ${targetSize}x${targetSize} pixels with a TRANSPARENT background.
+        2. Output MUST be ${targetSize}x${targetSize} pixels with a WHITE background.
         3. Enhance details and sharpness appropriate for the higher resolution.
         4. Do NOT alter the design, only improve quality and resolution.
     `;
